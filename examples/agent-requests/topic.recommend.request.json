@@ -1,0 +1,32 @@
+{
+  "requestId": "req_topic_recommend_001",
+  "taskType": "topic.recommend",
+  "platform": "xiaohongshu",
+  "userId": "demo-user",
+  "input": {
+    "preference": "更生活化一点",
+    "count": 3
+  },
+  "context": {
+    "savedPersona": {
+      "persona": {
+        "name": "大学生成长型学习规划博主"
+      },
+      "niche": {
+        "primary": "大学生成长"
+      },
+      "audience": ["大学生", "准备考证的新手"],
+      "contentStyle": ["真实", "经验分享", "可操作"]
+    },
+    "trendSnapshot": {
+      "hotTrends": ["低成本成长", "考证避坑"],
+      "audienceNeeds": ["快速上手", "降低试错成本"]
+    },
+    "topicHistory": []
+  },
+  "options": {
+    "language": "zh-CN",
+    "mode": "demo",
+    "contentType": "image_text_note"
+  }
+}

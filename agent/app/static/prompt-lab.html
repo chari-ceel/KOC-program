@@ -1,0 +1,1228 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>KOC Prompt Lab</title>
+  <style>
+    :root {
+      --bg: #f6f7f5;
+      --surface: #ffffff;
+      --surface-soft: #eef3ef;
+      --ink: #17201b;
+      --muted: #627068;
+      --line: #d7ded8;
+      --primary: #176b5c;
+      --primary-strong: #0d4f44;
+      --danger: #a93f33;
+      --gold: #a36b00;
+      --code: #101915;
+      --code-ink: #d9eee6;
+      --shadow: 0 18px 45px rgba(23, 32, 27, 0.08);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100dvh;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: "Segoe UI", "Microsoft YaHei", Arial, sans-serif;
+      letter-spacing: 0;
+    }
+
+    button, input, textarea, select {
+      font: inherit;
+    }
+
+    button {
+      min-height: 36px;
+      border: 1px solid transparent;
+      border-radius: 6px;
+      padding: 7px 11px;
+      background: var(--primary);
+      color: #fff;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background 180ms ease, border-color 180ms ease, opacity 180ms ease;
+    }
+
+    button:hover { background: var(--primary-strong); }
+    button:disabled { cursor: not-allowed; opacity: 0.55; }
+    button.secondary {
+      background: var(--surface);
+      color: var(--ink);
+      border-color: var(--line);
+    }
+    button.secondary:hover { border-color: var(--primary); }
+    button.danger {
+      background: var(--danger);
+    }
+
+    .app {
+      display: grid;
+      grid-template-columns: minmax(460px, 1fr) minmax(420px, 560px);
+      grid-template-rows: auto 1fr;
+      gap: 10px;
+      min-height: 100dvh;
+      padding: 10px;
+    }
+
+    .panel {
+      min-width: 0;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+    }
+
+    .sidebar {
+      grid-column: 1 / -1;
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 10px;
+    }
+
+    .header {
+      padding: 0;
+      border-bottom: 0;
+      min-width: 220px;
+    }
+
+    .panel-head {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .title {
+      margin: 0;
+      font-size: 18px;
+      line-height: 1.2;
+    }
+
+    .subtitle, .meta, .hint {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.35;
+    }
+
+    .section {
+      padding: 0;
+      border-bottom: 0;
+    }
+
+    .section:last-child { border-bottom: 0; }
+
+    label {
+      display: block;
+      margin: 8px 0 5px;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    input, textarea, select {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 10px 11px;
+      background: #fbfcfb;
+      color: var(--ink);
+      outline: none;
+    }
+
+    input:focus, textarea:focus, select:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(23, 107, 92, 0.14);
+    }
+
+    textarea {
+      resize: vertical;
+      min-height: 132px;
+      font-family: Consolas, "Microsoft YaHei", monospace;
+      font-size: 13px;
+      line-height: 1.55;
+    }
+
+    .scenario-list {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 6px;
+      min-width: 360px;
+    }
+
+    .scenario {
+      width: 100%;
+      min-height: 34px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      background: var(--surface);
+      color: var(--ink);
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 6px 8px;
+      font-size: 13px;
+    }
+
+    .scenario.active {
+      border-color: var(--primary);
+      background: var(--surface-soft);
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 24px;
+      padding: 3px 8px;
+      border-radius: 999px;
+      background: #e8f2ee;
+      color: var(--primary-strong);
+      font-size: 12px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .workspace {
+      display: grid;
+      grid-template-rows: auto 1fr;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .toolbar {
+      display: grid;
+      grid-template-columns: 1fr auto auto;
+      gap: 8px;
+      align-items: center;
+      padding: 9px 12px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .editor-scroll, .result-scroll {
+      min-height: 0;
+      overflow: auto;
+      padding: 12px;
+    }
+
+    .editor-grid {
+      display: grid;
+      gap: 10px;
+    }
+
+    .prompt-area { min-height: 320px; }
+
+    .row {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .model-list {
+      display: grid;
+      gap: 12px;
+    }
+
+    .model-card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 12px;
+      background: #fbfcfb;
+    }
+
+    .model-card.active {
+      border-color: rgba(23, 107, 92, 0.55);
+      background: #f6fbf8;
+    }
+
+    .model-card-head {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-height: 32px;
+    }
+
+    .model-card-head input {
+      width: 18px;
+      height: 18px;
+      margin: 0;
+      box-shadow: none;
+    }
+
+    .model-card-head label {
+      margin: 0;
+      color: var(--ink);
+      font-size: 15px;
+    }
+
+    .config-summary {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      margin-top: 6px;
+    }
+
+    .summary-row {
+      display: grid;
+      grid-template-columns: auto auto;
+      gap: 8px;
+      align-items: center;
+      min-height: 26px;
+      padding: 4px 7px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #fbfcfb;
+      font-size: 12px;
+    }
+
+    .summary-row strong {
+      font-size: 12px;
+    }
+
+    .summary-row span {
+      color: var(--muted);
+      overflow-wrap: anywhere;
+    }
+
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 1000;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 18px;
+      background: rgba(16, 25, 21, 0.48);
+    }
+
+    .modal-backdrop.open {
+      display: flex;
+    }
+
+    .modal {
+      width: min(960px, 100%);
+      max-height: min(860px, calc(100dvh - 36px));
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: 0 24px 70px rgba(16, 25, 21, 0.28);
+      overflow: hidden;
+    }
+
+    .modal-head, .modal-actions {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .modal-actions {
+      justify-content: flex-end;
+      border-top: 1px solid var(--line);
+      border-bottom: 0;
+    }
+
+    .modal-body {
+      min-height: 0;
+      overflow: auto;
+      padding: 16px;
+    }
+
+    .icon-button {
+      width: 44px;
+      min-width: 44px;
+      padding: 0;
+      background: var(--surface);
+      color: var(--ink);
+      border-color: var(--line);
+      font-size: 22px;
+      line-height: 1;
+    }
+
+    .modal-model-list {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .controls {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .output {
+      min-height: 360px;
+      margin: 0;
+      padding: 14px;
+      border-radius: 8px;
+      background: var(--code);
+      color: var(--code-ink);
+      white-space: pre-wrap;
+      word-break: break-word;
+      font: 13px/1.6 Consolas, "Microsoft YaHei", monospace;
+    }
+
+    .result-list {
+      display: grid;
+      gap: 14px;
+    }
+
+    .result-card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fbfcfb;
+      overflow: hidden;
+    }
+
+    .result-card-head {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+      align-items: center;
+      padding: 12px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .result-body {
+      padding: 12px;
+    }
+
+    .result-output {
+      min-height: 240px;
+      max-height: 520px;
+      overflow: auto;
+      margin: 0;
+      padding: 12px;
+      border-radius: 8px;
+      background: var(--code);
+      color: var(--code-ink);
+      white-space: pre-wrap;
+      word-break: break-word;
+      font: 13px/1.6 Consolas, "Microsoft YaHei", monospace;
+    }
+
+    .history {
+      display: grid;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .check-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-height: 44px;
+      margin-top: 12px;
+      color: var(--ink);
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .check-row input {
+      width: 18px;
+      height: 18px;
+      margin: 0;
+      box-shadow: none;
+    }
+
+    .sources {
+      display: grid;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .source-link {
+      display: block;
+      padding: 9px 10px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      color: var(--primary-strong);
+      background: #fbfcfb;
+      text-decoration: none;
+      font-size: 13px;
+      line-height: 1.45;
+      overflow-wrap: anywhere;
+    }
+
+    .history-item {
+      width: 100%;
+      min-height: 44px;
+      display: block;
+      text-align: left;
+      background: #fbfcfb;
+      color: var(--ink);
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 9px 10px;
+      font-weight: 500;
+    }
+
+    .status-line {
+      min-height: 20px;
+      color: var(--gold);
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    @media (max-width: 1180px) {
+      .app {
+        grid-template-columns: 1fr;
+      }
+      .result-panel {
+        grid-column: auto;
+      }
+      .sidebar {
+        grid-template-columns: 1fr;
+      }
+      .scenario-list {
+        min-width: 0;
+      }
+    }
+
+    @media (max-width: 760px) {
+      .app {
+        grid-template-columns: 1fr;
+        padding: 10px;
+      }
+      .toolbar, .row, .controls {
+        grid-template-columns: 1fr;
+      }
+      .modal-model-list {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <aside class="panel sidebar">
+      <div class="header">
+        <h1 class="title">KOC Prompt Lab</h1>
+        <div class="subtitle">四模型 Prompt 对比，Key 仅保存在当前页面内存。</div>
+      </div>
+
+      <div class="section">
+        <button id="openModelConfig" class="secondary">API 配置</button>
+        <div id="modelSummary" class="config-summary"></div>
+      </div>
+
+      <div class="section">
+        <div id="scenarioList" class="scenario-list"></div>
+      </div>
+
+      <div class="section">
+        <div class="controls">
+          <button id="saveVersion" class="secondary">保存版本</button>
+          <button id="resetScenario" class="secondary">恢复默认</button>
+        </div>
+      </div>
+    </aside>
+
+    <section class="panel workspace">
+      <div class="toolbar">
+        <div>
+          <strong id="currentName">人设打造</strong>
+          <div id="currentDesc" class="meta"></div>
+        </div>
+        <button id="runPrompt">运行 Prompt</button>
+        <button id="copyPrompt" class="secondary">复制 Prompt</button>
+      </div>
+
+      <div class="editor-scroll">
+        <div class="editor-grid">
+          <div>
+            <label for="systemPrompt">System Prompt</label>
+            <textarea id="systemPrompt" class="prompt-area"></textarea>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel result-panel">
+      <div class="panel-head">
+        <strong>输出与迭代</strong>
+        <div id="statusLine" class="status-line">未运行</div>
+      </div>
+
+      <div class="result-scroll">
+        <div id="retrievalPanel" class="result-card" style="display:none; margin-bottom:14px;">
+          <div class="result-card-head">
+            <div>
+              <strong>Tavily 检索</strong>
+              <div id="retrievalStatus" class="meta">未运行</div>
+            </div>
+            <span id="retrievalBadge" class="badge">retrieval</span>
+          </div>
+          <div class="result-body">
+            <pre id="retrievalOutput" class="result-output" style="min-height:120px;"></pre>
+            <label>检索来源</label>
+            <div id="retrievalSources" class="sources"></div>
+          </div>
+        </div>
+        <div id="resultList" class="result-list">
+          <div class="meta">勾选模型后点击运行，会在这里按模型展示输出。</div>
+        </div>
+
+        <label>本页版本记录</label>
+        <div id="history" class="history"></div>
+      </div>
+    </section>
+  </main>
+
+  <div id="modelConfigModal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="modelConfigTitle">
+    <div class="modal">
+      <div class="modal-head">
+        <div>
+          <strong id="modelConfigTitle">模型配置</strong>
+          <div class="meta">勾选要参与对比的模型，并为每个模型填写独立的 API Key、URL 和 Model。</div>
+        </div>
+        <button id="closeModelConfig" class="icon-button" aria-label="关闭模型配置" title="关闭">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="row">
+          <div>
+            <label for="temperature">Temperature</label>
+            <input id="temperature" type="number" min="0" max="1.5" step="0.1" value="0.4">
+          </div>
+          <div>
+            <label for="responseFormat">输出格式</label>
+            <select id="responseFormat">
+              <option value="text">文本</option>
+              <option value="json">JSON</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="model-card active" style="margin: 14px 0;">
+          <div class="model-card-head">
+            <input id="enableTavilySearch" type="checkbox">
+            <label for="enableTavilySearch">启用 Tavily 检索增强</label>
+          </div>
+          <label for="tavilyApiKey">Tavily API Key</label>
+          <input id="tavilyApiKey" type="password" autocomplete="off" placeholder="tvly-...">
+          <label for="tavilyQuery">检索关键词</label>
+          <input id="tavilyQuery" type="text" value="小红书 大学生成长 热门选题 近7天">
+          <div class="row">
+            <div>
+              <label for="tavilyMaxResults">检索条数</label>
+              <input id="tavilyMaxResults" type="number" min="1" max="10" step="1" value="5">
+            </div>
+            <div>
+              <label for="tavilyQueryMode">关键词来源</label>
+              <select id="tavilyQueryMode">
+                <option value="manual">使用上方关键词</option>
+                <option value="prompt">根据 Prompt 自动提取</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div id="modelList" class="model-list modal-model-list"></div>
+      </div>
+      <div class="modal-actions">
+        <button id="selectAllModels" class="secondary">全选</button>
+        <button id="saveModelConfig">完成</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+
+    const scenarios = {
+      persona: {
+        name: "人设打造",
+        badge: "persona",
+        desc: "把用户基础信息转成可运营、可复用的人设资产。",
+        systemPrompt: `你是小红书网红的人设策略专家，负责结合目前大热博主与网络趋势，把用户的零散信息整理成可持续运营的小红书账号人设。
+
+输出要求：
+1. 用中文输出，避免营销套话。
+2. 结论要具体，参考同赛道热点博主及其相关经历，能指导后续选题、内容撰写和账号主页包装。
+3. 不要虚构用户没有提供的硬经历；可以提出待确认问题。
+4. 输出必须包含：persona、niche、audience、contentStyle、referenceCreatorDirections、followUpQuestions。
+5. 每个字段都要短而可执行。
+
+测试输入：
+请分析以下用户基础信息，并输出一份小红书 KOC 人设方案：
+
+{
+  "gender": "女",
+  "age": 21,
+  "occupation": "大学生",
+  "interests": ["学习", "穿搭", "拍照"],
+  "skills": ["做计划", "整理资料"],
+  "goals": ["涨粉", "记录成长"]
+}`,
+        userPrompt: `请分析以下用户基础信息，并输出一份小红书 KOC 人设方案：
+
+{
+  "gender": "女",
+  "age": 21,
+  "occupation": "大学生",
+  "interests": ["学习", "穿搭", "拍照"],
+  "skills": ["做计划", "整理资料"],
+  "goals": ["涨粉", "记录成长"]
+}`
+      },
+      trend: {
+        name: "热门追踪",
+        badge: "trend",
+        desc: "把人设和偏好转成可拍、可验证的选题机会。",
+        systemPrompt: `你是小红书趋势分析和选题策划专家，负责为用户找到近期可执行的内容机会。
+
+输出要求：
+1. 基于用户人设判断匹配度给出相关热点，检索结果通过链接展示。
+2. 热点结合小红书目前主推活动与大热笔记相关内容和tag，并考虑到用户的适配度。
+3. 每个选题要给出推荐原因、拍摄难度、拍摄周期、拍摄成本和爆点。
+4. 如果启用了联网搜索，优先使用搜索结果中的近期信息；如果没有真实检索数据，要明确标记为假设，并给出后续验证关键词。
+5. 输出必须包含：trendSummary、hotTrends、audienceNeeds、topicOpportunities、validationKeywords。
+
+测试输入：
+请基于以下人设和偏好，给出 7 天内适合小红书的选题机会：
+
+人设：
+{
+  "persona": { "name": "大学生成长型学习规划博主" },
+  "niche": { "primary": "大学生成长", "secondary": ["考证规划", "资料整理", "时间管理"] },
+  "audience": ["大学生", "准备考证的新手", "想提升学习效率的人"],
+  "contentStyle": ["真实", "经验分享", "少说教", "可操作"]
+}
+
+偏好：我想找更容易涨粉的选题。`,
+        userPrompt: `请基于以下人设和偏好，给出 7 天内适合小红书的选题机会：
+
+人设：
+{
+  "persona": { "name": "大学生成长型学习规划博主" },
+  "niche": { "primary": "大学生成长", "secondary": ["考证规划", "资料整理", "时间管理"] },
+  "audience": ["大学生", "准备考证的新手", "想提升学习效率的人"],
+  "contentStyle": ["真实", "经验分享", "少说教", "可操作"]
+}
+
+偏好：我想找更容易涨粉的选题。`
+      },
+      content: {
+        name: "内容撰写",
+        badge: "draft",
+        desc: "把选题转成小红书图文笔记草稿和封面建议。",
+        systemPrompt: `你是小红书博主内容编辑，负责把选题写成能直接进入创作流程的图文笔记草稿。
+
+输出要求：
+1. 语气真实，像有经验的人在分享，不要像广告文案，具体遣词造句请结合用户的人设与内容，并且参考受众群体。
+2. 开头 3 秒必须给出冲突、收益或共鸣。
+3. 正文要有清晰段落和可执行步骤。
+4. 给出标题备选、正文、结尾互动、标签、封面文字和图片结构。
+5. 避免夸张承诺，避免“保姆级”“全网最全”等过度模板词。
+
+测试输入：
+请为以下选题生成一篇小红书图文笔记草稿：
+
+选题：大学生第一次考证最容易踩的 5 个坑
+角度：用真实踩坑经验降低新手焦虑
+人设：大学生成长型学习规划博主
+目标读者：大学生、准备考证的新手
+用户要求：语气真实一点，适合新手收藏`,
+        userPrompt: `请为以下选题生成一篇小红书图文笔记草稿：
+
+选题：大学生第一次考证最容易踩的 5 个坑
+角度：用真实踩坑经验降低新手焦虑
+人设：大学生成长型学习规划博主
+目标读者：大学生、准备考证的新手
+用户要求：语气真实一点，适合新手收藏`
+      }
+    };
+
+    const providerDefaults = {
+      anthropic: {
+        name: "Anthropic",
+        baseUrl: "https://api.openai-proxy.org/anthropic",
+        model: "claude-3-5-sonnet-latest",
+        placeholder: "sk-ant-..."
+      },
+      glm: {
+        name: "GLM",
+        baseUrl: "https://open.bigmodel.cn/api/paas/v4",
+        model: "glm-4.5",
+        placeholder: "请输入 GLM API Key"
+      },
+      gemini: {
+        name: "Gemini",
+        baseUrl: "https://api.openai-proxy.org/google/v1beta",
+        model: "gemini-2.5-flash",
+        placeholder: "AIza..."
+      },
+      qwen: {
+        name: "Qwen",
+        baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+        model: "qwen-plus",
+        placeholder: "sk-..."
+      }
+    };
+
+    let currentKey = "persona";
+    const history = [];
+
+    function localKey(key) {
+      return `koc_prompt_lab_${key}`;
+    }
+
+    function loadScenario(key) {
+      currentKey = key;
+      const saved = JSON.parse(localStorage.getItem(localKey(key)) || "null");
+      const scenario = saved || scenarios[key];
+      $("currentName").textContent = scenarios[key].name;
+      $("currentDesc").textContent = scenarios[key].desc;
+      $("systemPrompt").value = scenario.systemPrompt;
+      $("enableTavilySearch").checked = key === "trend";
+      $("tavilyQuery").value = key === "trend"
+        ? "小红书 大学生成长 热门选题 近7天"
+        : `${scenarios[key].name} 小红书 KOC prompt 调试`;
+      renderScenarios();
+    }
+
+    function modelFieldId(provider, field) {
+      return `${provider}_${field}`;
+    }
+
+    function renderModelList() {
+      $("modelList").innerHTML = "";
+      Object.entries(providerDefaults).forEach(([provider, defaults], index) => {
+        const card = document.createElement("div");
+        card.className = `model-card ${index === 0 ? "active" : ""}`;
+        card.innerHTML = `
+          <div class="model-card-head">
+            <input id="${modelFieldId(provider, "enabled")}" type="checkbox" ${index === 0 ? "checked" : ""}>
+            <label for="${modelFieldId(provider, "enabled")}">${defaults.name}</label>
+          </div>
+          <label for="${modelFieldId(provider, "apiKey")}">API Key</label>
+          <input id="${modelFieldId(provider, "apiKey")}" type="password" autocomplete="off" placeholder="${defaults.placeholder}">
+          <label for="${modelFieldId(provider, "baseUrl")}">Base URL</label>
+          <input id="${modelFieldId(provider, "baseUrl")}" type="text" value="${defaults.baseUrl}">
+          <label for="${modelFieldId(provider, "model")}">Model</label>
+          <input id="${modelFieldId(provider, "model")}" type="text" value="${defaults.model}">
+        `;
+        $("modelList").appendChild(card);
+        $(modelFieldId(provider, "enabled")).onchange = () => {
+          card.classList.toggle("active", $(modelFieldId(provider, "enabled")).checked);
+          renderModelSummary();
+        };
+        [modelFieldId(provider, "baseUrl"), modelFieldId(provider, "model")].forEach((id) => {
+          $(id).oninput = renderModelSummary;
+        });
+      });
+      renderModelSummary();
+    }
+
+    function selectedModels() {
+      return Object.entries(providerDefaults)
+        .filter(([provider]) => $(modelFieldId(provider, "enabled")).checked)
+        .map(([provider, defaults]) => ({
+          provider,
+          name: defaults.name,
+          apiKey: $(modelFieldId(provider, "apiKey")).value.trim(),
+          baseUrl: $(modelFieldId(provider, "baseUrl")).value.trim() || defaults.baseUrl,
+          model: $(modelFieldId(provider, "model")).value.trim() || defaults.model
+        }));
+    }
+
+    function renderModelSummary() {
+      const models = selectedModels();
+      $("modelSummary").innerHTML = "";
+      if (!models.length) {
+        $("modelSummary").innerHTML = `<div class="meta">尚未启用模型。点击模型配置选择要对比的模型。</div>`;
+      }
+      models.forEach((modelConfig) => {
+        const row = document.createElement("div");
+        row.className = "summary-row";
+        row.innerHTML = `<strong>${modelConfig.name}</strong><span>${modelConfig.model}</span>`;
+        $("modelSummary").appendChild(row);
+      });
+      const retrieval = document.createElement("div");
+      retrieval.className = "summary-row";
+      retrieval.innerHTML = `<strong>Tavily</strong><span>${$("enableTavilySearch").checked ? "已启用检索增强" : "未启用"}</span>`;
+      $("modelSummary").appendChild(retrieval);
+    }
+
+    function openModelConfig() {
+      $("modelConfigModal").classList.add("open");
+    }
+
+    function closeModelConfig() {
+      $("modelConfigModal").classList.remove("open");
+      renderModelSummary();
+    }
+
+    function renderScenarios() {
+      $("scenarioList").innerHTML = "";
+      Object.entries(scenarios).forEach(([key, scenario]) => {
+        const button = document.createElement("button");
+        button.className = `scenario ${key === currentKey ? "active" : ""}`;
+        button.innerHTML = `<strong>${scenario.name}</strong>`;
+        button.onclick = () => loadScenario(key);
+        $("scenarioList").appendChild(button);
+      });
+    }
+
+    function tavilyQuery() {
+      const mode = $("tavilyQueryMode").value;
+      const manualQuery = $("tavilyQuery").value.trim();
+      if (mode === "manual" && manualQuery) {
+        return manualQuery;
+      }
+      return [
+        scenarios[currentKey].name,
+        $("systemPrompt").value.slice(0, 420)
+      ].join("\n").replace(/\s+/g, " ").slice(0, 420);
+    }
+
+    async function runTavilySearch() {
+      if (!$("enableTavilySearch").checked) {
+        return null;
+      }
+      const apiKey = $("tavilyApiKey").value.trim();
+      if (!apiKey) {
+        return {
+          status: "failed",
+          error: { code: "MISSING_API_KEY", message: "已启用 Tavily 检索，但没有输入 Tavily API Key。" },
+          sources: [],
+          results: []
+        };
+      }
+      const response = await fetch("/__prompt-lab/debug/tavily/search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          apiKey,
+          query: tavilyQuery(),
+          maxResults: Number($("tavilyMaxResults").value || 5),
+          includeAnswer: true
+        })
+      });
+      return response.json();
+    }
+
+    function retrievalPromptBlock(retrieval) {
+      if (!retrieval || retrieval.status !== "success") {
+        return "";
+      }
+      const lines = [
+        "",
+        "以下是 Tavily 联网检索结果。请优先基于这些材料回答；若材料不足，请明确说明哪些判断是推断。",
+        `检索问题：${retrieval.query || tavilyQuery()}`
+      ];
+      if (retrieval.answer) {
+        lines.push(`综合摘要：${retrieval.answer}`);
+      }
+      (retrieval.results || []).forEach((result) => {
+        lines.push(
+          `[${result.index}] ${result.title}\nURL: ${result.url}\n摘要: ${result.content}`
+        );
+      });
+      return lines.join("\n");
+    }
+
+    function renderRetrieval(retrieval) {
+      if (!retrieval) {
+        $("retrievalPanel").style.display = "none";
+        return;
+      }
+      $("retrievalPanel").style.display = "block";
+      $("retrievalBadge").textContent = retrieval.status || "failed";
+      $("retrievalStatus").textContent = `${retrieval.query || tavilyQuery()} · HTTP ${retrieval.httpStatus || "-"}`;
+      $("retrievalOutput").textContent = retrieval.status === "success"
+        ? retrievalPromptBlock(retrieval).trim()
+        : JSON.stringify(retrieval, null, 2);
+      renderSourcesInto($("retrievalSources"), retrieval.sources || []);
+    }
+
+    function buildInitialTrendAgentPrompt(userInput) {
+      const rawInput = String(userInput || "").trim();
+      return [
+        "这是热门追踪初始页的首条业务输入。",
+        "请把用户原始输入直接理解为本轮要追踪的赛道、方向、偏好或线索，不要先停留在讨论态，也不要只做解释。",
+        "请直接输出一版可展示、可保存的完整热门追踪结果，完整覆盖 trendSummary、hotTrends、audienceNeeds、topicOpportunities、validationKeywords 和 cardPreview。",
+        `用户原始输入：${rawInput}`
+      ].join("\n");
+    }
+
+    function buildInitialContentAgentPrompt(topic, instruction) {
+      const rawTopic = String(topic || "").trim();
+      const rawInstruction = String(instruction || "").trim() || rawTopic;
+      return [
+        "这是内容撰写初始页的首条业务输入。",
+        "请把用户原始输入直接理解为本轮要写的主题、口吻要求或写作方向，不要先停留在讨论态，也不要只给思路。",
+        "请直接输出一版可展示、可保存的完整小红书图文草稿，完整覆盖标题、引入、正文、结尾、标签、封面建议、图文结构、视频建议和 cardPreview。",
+        `主题：${rawTopic}`,
+        `用户原始输入：${rawInstruction}`
+      ].join("\n");
+    }
+
+    function buildScenarioUserPrompt() {
+      const scenario = scenarios[currentKey];
+      if (!scenario) {
+        return "";
+      }
+      if (currentKey === "trend") {
+        return buildInitialTrendAgentPrompt(scenario.userPrompt || "");
+      }
+      if (currentKey === "content") {
+        return buildInitialContentAgentPrompt(scenario.name || "内容撰写", scenario.userPrompt || "");
+      }
+      return scenario.userPrompt || "";
+    }
+
+    async function runModel(modelConfig, retrieval) {
+      const endpoint = "/__prompt-lab/debug/model/prompt-lab";
+      const retrievalBlock = retrievalPromptBlock(retrieval);
+      const scenarioPrompt = buildScenarioUserPrompt();
+      const userPrompt = retrievalBlock
+        ? [scenarioPrompt, "", retrievalBlock].filter(Boolean).join("\n")
+        : scenarioPrompt;
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          provider: modelConfig.provider,
+          apiKey: modelConfig.apiKey,
+          baseUrl: modelConfig.baseUrl,
+          model: modelConfig.model,
+          temperature: Number($("temperature").value || 0.4),
+          responseFormat: $("responseFormat").value,
+          enableGoogleSearch: false,
+          requireGoogleSearch: false,
+          systemPrompt: $("systemPrompt").value,
+          userPrompt
+        })
+      });
+      return response.json();
+    }
+
+    async function runPrompt() {
+      const models = selectedModels();
+      if (!models.length) {
+        $("statusLine").textContent = "请至少勾选一个模型";
+        return;
+      }
+      $("runPrompt").disabled = true;
+      $("statusLine").textContent = $("enableTavilySearch").checked
+        ? `检索中 · ${models.length} 个模型待运行`
+        : `运行中 · ${models.length} 个模型`;
+      renderResultSkeleton(models);
+
+      try {
+        const retrieval = await runTavilySearch();
+        renderRetrieval(retrieval);
+        if (retrieval && retrieval.status === "failed") {
+          $("statusLine").textContent = `Tavily 检索失败，继续运行模型 · ${models.length} 个模型`;
+        } else if (retrieval) {
+          $("statusLine").textContent = `检索完成 · 运行中 · ${models.length} 个模型`;
+        }
+        const results = await Promise.all(models.map(async (modelConfig) => {
+          try {
+            const data = await runModel(modelConfig, retrieval);
+            if (retrieval && retrieval.status === "success") {
+              data.sources = mergeSources(data.sources || [], retrieval.sources || []);
+            }
+            return { modelConfig, data };
+          } catch (error) {
+            return {
+              modelConfig,
+              data: {
+                status: "failed",
+                httpStatus: null,
+                outputText: String(error && error.stack || error),
+                error: { code: "CLIENT_ERROR", message: String(error && error.message || error) }
+              }
+            };
+          }
+        }));
+        renderResults(results);
+        const successCount = results.filter((item) => item.data.status === "success").length;
+        $("statusLine").textContent = `完成 · ${successCount}/${results.length} 成功`;
+        history.unshift({
+          key: currentKey,
+          name: scenarios[currentKey].name,
+          time: new Date().toLocaleString(),
+          status: `${successCount}/${results.length} 成功`,
+          retrieval,
+          results: results.map(({ modelConfig, data }) => ({
+            modelConfig: {
+              provider: modelConfig.provider,
+              name: modelConfig.name,
+              baseUrl: modelConfig.baseUrl,
+              model: modelConfig.model
+            },
+            data
+          })),
+          systemPrompt: $("systemPrompt").value,
+          userPrompt: buildScenarioUserPrompt()
+        });
+        renderHistory();
+      } catch (error) {
+        $("statusLine").textContent = "运行失败";
+        $("resultList").innerHTML = `<div class="meta">${String(error && error.stack || error)}</div>`;
+      } finally {
+        $("runPrompt").disabled = false;
+      }
+    }
+
+    function renderResultSkeleton(models) {
+      $("resultList").innerHTML = "";
+      models.forEach((modelConfig) => {
+        const card = document.createElement("article");
+        card.className = "result-card";
+        card.innerHTML = `
+          <div class="result-card-head">
+            <div>
+              <strong>${modelConfig.name}</strong>
+              <div class="meta">${modelConfig.model}</div>
+            </div>
+            <span class="badge">运行中</span>
+          </div>
+          <div class="result-body">
+            <pre class="result-output">等待响应...</pre>
+          </div>
+        `;
+        $("resultList").appendChild(card);
+      });
+    }
+
+    function renderResults(results) {
+      $("resultList").innerHTML = "";
+      results.forEach(({ modelConfig, data }) => {
+        const card = document.createElement("article");
+        card.className = "result-card";
+        const outputText = data.outputText || JSON.stringify(data, null, 2);
+        card.innerHTML = `
+          <div class="result-card-head">
+            <div>
+              <strong>${modelConfig.name}</strong>
+              <div class="meta">${data.model || modelConfig.model} · HTTP ${data.httpStatus || "-"} · ${formatUsage(data.usage)}</div>
+            </div>
+            <span class="badge">${data.status}</span>
+          </div>
+          <div class="result-body">
+            <pre class="result-output"></pre>
+            <label>联网来源</label>
+            <div class="sources"></div>
+          </div>
+        `;
+        card.querySelector(".result-output").textContent = outputText;
+        renderSourcesInto(card.querySelector(".sources"), data.sources || []);
+        $("resultList").appendChild(card);
+      });
+    }
+
+    function formatUsage(usage) {
+      if (!usage || !Object.keys(usage).length) {
+        return "usage -";
+      }
+      const input = usage.input_tokens ?? usage.prompt_tokens ?? usage.promptTokenCount;
+      const output = usage.output_tokens ?? usage.completion_tokens ?? usage.candidatesTokenCount;
+      const total = usage.total_tokens ?? usage.totalTokenCount;
+      return `usage ${input ?? "-"} / ${output ?? "-"} / ${total ?? "-"}`;
+    }
+
+    function mergeSources(primary, secondary) {
+      const seen = new Set();
+      return [...primary, ...secondary].filter((source) => {
+        if (!source || !source.url || seen.has(source.url)) {
+          return false;
+        }
+        seen.add(source.url);
+        return true;
+      });
+    }
+
+    function renderHistory() {
+      $("history").innerHTML = "";
+      history.slice(0, 8).forEach((item, index) => {
+        const button = document.createElement("button");
+        button.className = "history-item";
+        button.textContent = `${item.time} · ${item.name} · ${item.status}`;
+        button.onclick = () => {
+          currentKey = item.key;
+          $("systemPrompt").value = item.systemPrompt;
+          renderRetrieval(item.retrieval || null);
+          renderResults(item.results || []);
+          $("statusLine").textContent = `已载入历史 #${index + 1}`;
+          renderScenarios();
+        };
+        $("history").appendChild(button);
+      });
+    }
+
+    $("runPrompt").onclick = runPrompt;
+    $("saveVersion").onclick = () => {
+      localStorage.setItem(localKey(currentKey), JSON.stringify({
+        systemPrompt: $("systemPrompt").value
+      }));
+      $("statusLine").textContent = `已保存 ${scenarios[currentKey].name} 当前版本`;
+    };
+    $("resetScenario").onclick = () => {
+      localStorage.removeItem(localKey(currentKey));
+      loadScenario(currentKey);
+      $("statusLine").textContent = `已恢复 ${scenarios[currentKey].name} 默认版本`;
+    };
+    $("copyPrompt").onclick = async () => {
+      const text = `# System Prompt\n${$("systemPrompt").value}`;
+      await navigator.clipboard.writeText(text);
+      $("statusLine").textContent = "Prompt 已复制";
+    };
+    $("openModelConfig").onclick = openModelConfig;
+    $("closeModelConfig").onclick = closeModelConfig;
+    $("saveModelConfig").onclick = closeModelConfig;
+    $("selectAllModels").onclick = () => {
+      Object.keys(providerDefaults).forEach((provider) => {
+        const checkbox = $(modelFieldId(provider, "enabled"));
+        checkbox.checked = true;
+        checkbox.closest(".model-card").classList.add("active");
+      });
+      renderModelSummary();
+    };
+    ["enableTavilySearch", "tavilyQuery", "tavilyQueryMode", "tavilyMaxResults"].forEach((id) => {
+      $(id).oninput = renderModelSummary;
+      $(id).onchange = renderModelSummary;
+    });
+    $("modelConfigModal").onclick = (event) => {
+      if (event.target === $("modelConfigModal")) {
+        closeModelConfig();
+      }
+    };
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && $("modelConfigModal").classList.contains("open")) {
+        closeModelConfig();
+      }
+    });
+
+    function renderSourcesInto(container, sources) {
+      container.innerHTML = "";
+      if (!sources.length) {
+        container.innerHTML = `<div class="meta">未启用或暂无来源。</div>`;
+        return;
+      }
+      sources.forEach((source) => {
+        const link = document.createElement("a");
+        link.className = "source-link";
+        link.href = source.url;
+        link.target = "_blank";
+        link.rel = "noreferrer";
+        link.textContent = source.title || source.url;
+        container.appendChild(link);
+      });
+    }
+
+    renderModelList();
+    loadScenario(currentKey);
+  </script>
+</body>
+</html>

@@ -1,0 +1,61 @@
+{
+  "requestId": "req_persona_follow_up_001",
+  "taskType": "persona.follow_up",
+  "platform": "xiaohongshu",
+  "status": "success",
+  "data": {
+    "reply": "你的优势比较适合做“大学生成长 + 学习规划”方向。这个方向能把你的计划能力、资料整理能力和真实校园经验结合起来。",
+    "nextQuestions": [
+      "你更希望内容偏学习规划、考证经验，还是校园生活效率？",
+      "你愿意在笔记中展示自己的真实时间表或资料整理过程吗？"
+    ],
+    "isReadyToSave": true,
+    "personaDraft": {
+      "persona": {
+        "name": "大学生成长型学习规划博主",
+        "description": "用真实校园经验帮助同龄人降低学习和考证试错成本"
+      },
+      "niche": {
+        "primary": "大学生成长",
+        "secondary": ["考证规划", "资料整理", "时间管理"]
+      },
+      "audience": ["大学生", "准备考证的新手", "想提升学习效率的人"],
+      "contentStyle": ["真实", "可操作", "少说教"],
+      "cardPreview": {
+        "personaLabel": "成长规划",
+        "baseProfile": "女 · 21 · 学生",
+        "keywordsLabel": "考证 · 资料",
+        "audienceLabel": "大学生",
+        "toneLabel": "真实实用"
+      }
+    }
+  },
+  "savePayload": {
+    "type": "persona_conversation_turn",
+    "suggestedCollection": "persona_conversations",
+    "data": {
+      "userMessage": "我比较擅长做计划，也经常帮同学整理考证资料。",
+      "agentReply": "你的优势比较适合做“大学生成长 + 学习规划”方向。",
+      "personaDraft": {
+        "persona": {
+          "name": "大学生成长型学习规划博主"
+        },
+        "cardPreview": {
+          "personaLabel": "成长规划",
+          "baseProfile": "女 · 21 · 学生",
+          "keywordsLabel": "考证 · 资料",
+          "audienceLabel": "大学生",
+          "toneLabel": "真实实用"
+        }
+      }
+    }
+  },
+  "sources": [],
+  "toolCalls": [],
+  "warnings": [],
+  "error": null,
+  "metadata": {
+    "agentVersion": "0.1.0",
+    "durationMs": 850
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "conversationHistory": [],
+  "persona": {
+    "title": "大学生成长型学习博主",
+    "keywords": [
+      "大学生成长",
+      "学习规划",
+      "个人成长"
+    ],
+    "personaPosition": "大学生成长型学习博主",
+    "contentTone": "真实、经验分享、少说教、可操作"
+  },
+  "topic": "大学",
+  "userId": "demo-user",
+  "instruction": "请基于主题「大学」生成小红书笔记草稿。",
+  "writingEntrySource": {
+    "sourceType": "manual_input",
+    "inputText": "大学"
+  }
+}

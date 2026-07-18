@@ -1,0 +1,30 @@
+{
+  "requestId": "req_memory_summary_001",
+  "taskType": "memory.summarize_conversation",
+  "platform": "xiaohongshu",
+  "status": "success",
+  "data": {
+    "conversationSummary": {
+      "version": "v1",
+      "scene": "persona",
+      "coveredMessageCount": 0,
+      "userGoal": "",
+      "confirmedFacts": [],
+      "assistantFindings": [],
+      "userFeedback": [],
+      "decisions": [],
+      "openQuestions": [],
+      "latestFocus": "",
+      "artifactNotes": []
+    }
+  },
+  "savePayload": {},
+  "sources": [],
+  "toolCalls": [],
+  "warnings": [],
+  "error": null,
+  "metadata": {
+    "agentVersion": "0.1.0",
+    "durationMs": 600
+  }
+}

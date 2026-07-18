@@ -1,0 +1,99 @@
+services:
+  mongo:
+    image: mongo:7
+    restart: always
+    ports:
+      - "127.0.0.1:27017:27017"
+    volumes:
+      - mongo_data:/data/db
+
+  agent:
+    build:
+      context: .
+      dockerfile: agent/Dockerfile
+    expose:
+      - "8010"
+    environment:
+      - AGENT_PORT=8010
+      - AGENT_RUNTIME_MODE=${AGENT_RUNTIME_MODE:-model}
+      - ENABLE_DEBUG_AUTH=${ENABLE_DEBUG_AUTH:-true}
+      - MODEL_API_KEY=${MODEL_API_KEY:-}
+      - MODEL_BASE_URL=${MODEL_BASE_URL:-https://api.openai-proxy.org/google/v1beta}
+      - MODEL_NAME=${MODEL_NAME:-gemini-2.5-flash}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - ENABLE_WEB_SEARCH=${ENABLE_WEB_SEARCH:-true}
+      - WEB_SEARCH_PROVIDER=${WEB_SEARCH_PROVIDER:-}
+      - WEB_SEARCH_API_KEY=${WEB_SEARCH_API_KEY:-}
+      - WEB_SEARCH_TIMEOUT_MS=${WEB_SEARCH_TIMEOUT_MS:-8000}
+    restart: unless-stopped
+
+  backend:
+    build: ./backend
+    ports:
+      - "127.0.0.1:5001:8000"
+    environment:
+      - MONGO_URI=mongodb://mongo:27017
+      - PERSONA_DB_NAME=koc_agent_persona
+      - TREND_DB_NAME=koc_agent_trend
+      - CONTENT_DB_NAME=koc_agent_content
+      - MEMORY_MODEL_API_KEY=${MEMORY_MODEL_API_KEY:-}
+      - MEMORY_MODEL_BASE_URL=${MEMORY_MODEL_BASE_URL:-https://open.bigmodel.cn/api/paas/v4}
+      - MEMORY_MODEL_NAME=${MEMORY_MODEL_NAME:-glm-4.5-flash}
+      - AGENT_ENABLE_TOOLS=${AGENT_ENABLE_TOOLS:-true}
+      - AGENT_REQUEST_TIMEOUT_SECONDS=${AGENT_REQUEST_TIMEOUT_SECONDS:-180}
+      - AGENT_RUNTIME_PROVIDER=${AGENT_RUNTIME_PROVIDER:-model}
+      - AGENT_BASE_URL=http://agent:8010
+      - CORS_ALLOW_ORIGINS=${CORS_ALLOW_ORIGINS:-http://localhost:3000,http://localhost:5000,http://localhost:8081,http://localhost:8928,http://127.0.0.1:3000,http://127.0.0.1:5000,http://127.0.0.1:8081,http://127.0.0.1:8928}
+    depends_on:
+      - mongo
+      - agent
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://127.0.0.1:5001}
+        - API_PROXY_TARGET=http://backend:8000
+        - AGENT_PROXY_TARGET=http://agent:8010
+        - NEXT_PUBLIC_SHOW_ANALYSIS_MODULES=${NEXT_PUBLIC_SHOW_ANALYSIS_MODULES:-false}
+        - NEXT_PUBLIC_SHOW_PROMPT_DEBUG=${NEXT_PUBLIC_SHOW_PROMPT_DEBUG:-false}
+        - NEXT_PUBLIC_SHOW_PROMPT_LAB=${NEXT_PUBLIC_SHOW_PROMPT_LAB:-false}
+    environment:
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://127.0.0.1:5001}
+      - API_PROXY_TARGET=http://backend:8000
+      - AGENT_PROXY_TARGET=http://agent:8010
+      - NEXT_PUBLIC_SHOW_ANALYSIS_MODULES=${NEXT_PUBLIC_SHOW_ANALYSIS_MODULES:-false}
+      - NEXT_PUBLIC_SHOW_PROMPT_DEBUG=${NEXT_PUBLIC_SHOW_PROMPT_DEBUG:-false}
+      - NEXT_PUBLIC_SHOW_PROMPT_LAB=${NEXT_PUBLIC_SHOW_PROMPT_LAB:-false}
+      - PROMPT_DIR=/prompts
+    volumes:
+      - ./prompts:/prompts:ro
+    ports:
+      - "127.0.0.1:5000:3000"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  health:
+    image: busybox:latest
+    command: ["sh", "-c", "mkdir -p /www && echo ok > /www/index.html && httpd -f -p 80 -h /www"]
+    ports:
+      - "127.0.0.1:5002:80"
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:1.27-alpine
+    ports:
+      - "8928:8928"
+    volumes:
+      - ./deploy/nginx/kocagent.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - frontend
+      - backend
+      - health
+    restart: unless-stopped
+
+volumes:
+  mongo_data:

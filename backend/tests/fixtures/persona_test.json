@@ -1,0 +1,12 @@
+{
+  "userId": "demo-user",
+  "basicInfo": {
+    "gender": "女",
+    "age": 21,
+    "occupation": "大学生",
+    "interests": ["学习规划", "穿搭", "拍照"],
+    "skills": ["资料整理", "时间管理"],
+    "goals": ["小红书起号"]
+  },
+  "outputChannels": ["frontend"]
+}

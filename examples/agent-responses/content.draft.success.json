@@ -1,0 +1,61 @@
+{
+  "requestId": "req_content_draft_001",
+  "taskType": "content.draft",
+  "platform": "xiaohongshu",
+  "status": "success",
+  "data": {
+    "draft": {
+      "titleOptions": [
+        "第一次考证，我最想提前知道的 5 件事",
+        "大学生考证前一定要避开的 5 个坑"
+      ],
+      "selectedTitle": "第一次考证，我最想提前知道的 5 件事",
+      "hook": "如果你也是第一次准备考证，先别急着买一堆资料。",
+      "body": "我第一次准备考证的时候，最大的感受不是难，而是不知道从哪里开始。后来复盘了一下，真正浪费时间的不是学习本身，而是前期这些坑：1. 还没确定考试时间就开始囤资料；2. 看到别人推荐就全买；3. 没有拆到每周任务；4. 只收藏经验贴不执行；5. 复盘太晚，发现问题时已经来不及调整。",
+      "ending": "你第一次考证最担心哪一步？可以留言，我整理下一篇。",
+      "tags": ["#大学生成长", "#考证规划", "#学习方法", "#小红书成长笔记"],
+      "coverSuggestion": {
+        "mainText": "第一次考证避坑清单",
+        "layout": "大标题 + 5 个关键词",
+        "visualStyle": "清爽、真实、适合收藏"
+      },
+      "imageTextStructure": [
+        "封面：第一次考证避坑清单",
+        "图 1：为什么新手容易踩坑",
+        "图 2-6：五个常见坑",
+        "图 7：总结和互动提问"
+      ],
+      "videoSuggestion": {
+        "opening": "3 秒说出痛点：第一次考证别急着买资料",
+        "shots": ["桌面资料", "计划表", "复盘笔记"],
+        "note": "一期主做图文，视频建议作为扩展输出"
+      },
+      "cardPreview": {
+        "keywords": ["考证避坑", "资料选择", "新手规划"]
+      }
+    }
+  },
+  "savePayload": {
+    "type": "content_draft",
+    "suggestedCollection": "content_drafts",
+    "data": {
+      "draft": {
+        "selectedTitle": "第一次考证，我最想提前知道的 5 件事",
+        "body": "我第一次准备考证的时候，最大的感受不是难，而是不知道从哪里开始。",
+        "tags": ["#大学生成长", "#考证规划", "#学习方法", "#小红书成长笔记"],
+        "cardPreview": {
+          "keywords": ["考证避坑", "资料选择", "新手规划"]
+        }
+      },
+      "sourceTaskType": "content.draft"
+    }
+  },
+  "sources": [],
+  "toolCalls": [],
+  "warnings": [],
+  "error": null,
+  "metadata": {
+    "agentVersion": "0.1.0",
+    "durationMs": 1300
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "userId": "demo-user",
+  "preference": "大学生成长赛道最近一周有什么适合做的热点选题",
+  "persona": {
+    "title": "大学生成长型学习博主",
+    "personaPosition": "大学生成长型学习博主 / 大学 / 学习规划",
+    "contentTone": "真实、经验分享、少说教、可操作",
+    "keywords": ["大学生成长", "学习规划", "个人成长"]
+  },
+  "conversationHistory": []
+}

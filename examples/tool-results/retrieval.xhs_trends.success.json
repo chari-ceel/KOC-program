@@ -1,0 +1,29 @@
+{
+  "source": "mock_retrieval",
+  "items": [
+    {
+      "title": "大学生成长赛道本周热门话题",
+      "url": null,
+      "summary": "低成本成长、考证规划、真实经验分享更受关注。",
+      "platform": "xiaohongshu",
+      "publishedAt": null,
+      "metrics": {
+        "likes": null,
+        "saves": null,
+        "comments": null
+      }
+    },
+    {
+      "title": "考证避坑清单类内容更适合收藏",
+      "url": null,
+      "summary": "新手更关注资料选择、时间规划和少走弯路。",
+      "platform": "xiaohongshu",
+      "publishedAt": null,
+      "metrics": {
+        "likes": null,
+        "saves": null,
+        "comments": null
+      }
+    }
+  ]
+}

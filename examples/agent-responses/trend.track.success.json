@@ -1,0 +1,111 @@
+{
+  "requestId": "req_trend_track_001",
+  "taskType": "trend.track",
+  "platform": "xiaohongshu",
+  "status": "success",
+  "data": {
+    "trendSummary": {
+      "period": "7d",
+      "platform": "xiaohongshu",
+      "niche": "大学生成长",
+      "summary": "近一周大学生成长赛道中，低成本、可执行、少踩坑类内容更容易被收藏。"
+    },
+    "hotTrends": [
+      {
+        "name": "低成本成长",
+        "reason": "用户更愿意收藏可直接复用的方法和清单",
+        "heatLevel": "high"
+      },
+      {
+        "name": "考证避坑",
+        "reason": "新手用户对流程、资料和时间规划的不确定性较强",
+        "heatLevel": "medium"
+      }
+    ],
+    "audienceNeeds": [
+      {
+        "need": "快速上手",
+        "evidence": "相关内容集中在新手、少踩坑、清单类表达",
+        "confidence": "medium"
+      },
+      {
+        "need": "降低试错成本",
+        "evidence": "平价、低成本、真实经验类表达更适合收藏",
+        "confidence": "medium"
+      }
+    ],
+    "topicOpportunities": [
+      {
+        "title": "大学生第一次考证最容易踩的 5 个坑",
+        "angle": "用真实踩坑经验降低新手焦虑",
+        "fitReason": "匹配学习规划人设和新手受众",
+        "difficulty": "low"
+      },
+      {
+        "title": "我用一张表把考证计划拆明白了",
+        "angle": "用可复制模板提升收藏价值",
+        "fitReason": "匹配资料整理和做计划能力",
+        "difficulty": "medium"
+      },
+      {
+        "title": "大学生低成本提升自己的 7 件小事",
+        "angle": "把成长建议做得更生活化",
+        "fitReason": "适合涨粉和泛成长受众",
+        "difficulty": "low"
+      }
+    ],
+    "cardPreview": {
+      "discoveryKeywords": ["低成本成长", "考证避坑", "收藏清单"],
+      "shortTopics": ["考证避坑", "低成本自律", "期末复习清单"]
+    }
+  },
+  "savePayload": {
+    "type": "trend_tracking_result",
+    "suggestedCollection": "trend_tracking_results",
+    "data": {
+      "trendSummary": {
+        "period": "7d",
+        "platform": "xiaohongshu",
+        "niche": "大学生成长"
+      },
+      "hotTrends": [],
+      "audienceNeeds": [],
+      "topicOpportunities": [],
+      "cardPreview": {
+        "discoveryKeywords": ["低成本成长", "考证避坑", "收藏清单"],
+        "shortTopics": ["考证避坑", "低成本自律", "期末复习清单"]
+      }
+    }
+  },
+  "sources": [
+    {
+      "sourceType": "mock_retrieval",
+      "title": "Mock Xiaohongshu trend samples",
+      "url": null,
+      "summary": "Demo mock trend results for integration testing.",
+      "retrievedAt": "2026-05-03T12:00:00+08:00"
+    }
+  ],
+  "toolCalls": [
+    {
+      "toolName": "retrieval.search",
+      "toolType": "retrieval",
+      "status": "success",
+      "inputSummary": {
+        "query": "小红书 大学生成长 热门选题",
+        "platform": "xiaohongshu",
+        "limit": 10
+      },
+      "outputSummary": {
+        "itemCount": 3
+      },
+      "durationMs": 700
+    }
+  ],
+  "warnings": [],
+  "error": null,
+  "metadata": {
+    "agentVersion": "0.1.0",
+    "durationMs": 1800
+  }
+}

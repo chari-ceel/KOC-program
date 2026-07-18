@@ -1,0 +1,19 @@
+{
+  "requestId": "req_mock_content_draft",
+  "taskType": "content.draft",
+  "platform": "xiaohongshu",
+  "status": "success",
+  "data": {
+    "title": "三步打造高效学习计划",
+    "hook": "这份计划让你的期末复习不再迷茫",
+    "body": "第一步：整理时间，第二步：规划内容，第三步：持续复盘。",
+    "tags": ["学习计划", "时间管理"]
+  },
+  "savePayload": {
+    "type": "draft",
+    "data": {
+      "draftId": "draft_demo_01"
+    }
+  },
+  "warnings": []
+}

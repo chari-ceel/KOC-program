@@ -1,0 +1,44 @@
+{
+  "requestId": "req_general_chat_001",
+  "taskType": "general.chat",
+  "platform": "xiaohongshu",
+  "status": "success",
+  "data": {
+    "reply": "我可以帮你做人设打造、热门追踪和小红书内容撰写。你可以先告诉我你的基础信息，或者直接说你想写什么主题。",
+    "suggestedActions": [
+      {
+        "label": "开始人设打造",
+        "taskType": "persona.analyze"
+      },
+      {
+        "label": "查看热门选题",
+        "taskType": "trend.track"
+      }
+    ]
+  },
+  "savePayload": {
+    "type": "general_chat_turn",
+    "suggestedCollection": "agent_conversations",
+    "data": {
+      "reply": "我可以帮你做人设打造、热门追踪和小红书内容撰写。你可以先告诉我你的基础信息，或者直接说你想写什么主题。",
+      "suggestedActions": [
+        {
+          "label": "开始人设打造",
+          "taskType": "persona.analyze"
+        },
+        {
+          "label": "查看热门选题",
+          "taskType": "trend.track"
+        }
+      ]
+    }
+  },
+  "sources": [],
+  "toolCalls": [],
+  "warnings": [],
+  "error": null,
+  "metadata": {
+    "agentVersion": "0.1.0",
+    "durationMs": 600
+  }
+}

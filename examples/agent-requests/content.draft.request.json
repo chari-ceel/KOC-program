@@ -1,0 +1,37 @@
+{
+  "requestId": "req_content_draft_001",
+  "taskType": "content.draft",
+  "platform": "xiaohongshu",
+  "userId": "demo-user",
+  "input": {
+    "topic": "大学生第一次考证最容易踩的 5 个坑",
+    "userInstruction": "语气真实一点，适合新手收藏"
+  },
+  "context": {
+    "savedPersona": {
+      "persona": {
+        "name": "大学生成长型学习规划博主"
+      },
+      "niche": {
+        "primary": "大学生成长"
+      },
+      "audience": ["大学生", "准备考证的新手"],
+      "contentStyle": ["真实", "经验分享", "少说教", "可操作"]
+    },
+    "selectedTopic": {
+      "title": "大学生第一次考证最容易踩的 5 个坑",
+      "angle": "用真实踩坑经验降低新手焦虑"
+    },
+    "latestTrendSnapshot": {
+      "hotTrends": ["低成本成长", "考证避坑"],
+      "audienceNeeds": ["快速上手", "降低试错成本"]
+    },
+    "draftHistory": []
+  },
+  "options": {
+    "language": "zh-CN",
+    "mode": "demo",
+    "contentType": "image_text_note",
+    "enableTools": false
+  }
+}

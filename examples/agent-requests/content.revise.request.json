@@ -1,0 +1,29 @@
+{
+  "requestId": "req_content_revise_001",
+  "taskType": "content.revise",
+  "platform": "xiaohongshu",
+  "userId": "demo-user",
+  "input": {
+    "revisionInstruction": "标题更吸引人一点，增加真实经历"
+  },
+  "context": {
+    "currentDraft": {
+      "selectedTitle": "第一次考证，我最想提前知道的 5 件事",
+      "hook": "如果你也是第一次准备考证，先别急着买一堆资料。",
+      "body": "正文内容",
+      "tags": ["#大学生成长", "#考证规划"]
+    },
+    "savedPersona": {
+      "persona": {
+        "name": "大学生成长型学习规划博主"
+      },
+      "contentStyle": ["真实", "经验分享", "可操作"]
+    },
+    "latestTrendSnapshot": {}
+  },
+  "options": {
+    "language": "zh-CN",
+    "mode": "demo",
+    "contentType": "image_text_note"
+  }
+}

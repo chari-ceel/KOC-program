@@ -1,0 +1,319 @@
+[
+  {
+    "id": "MD-FX-001",
+    "scenario": "general",
+    "surface": "chat_text",
+    "fieldPath": "message.content",
+    "input": "这个方向可以。\n*\n建议先缩小主题。",
+    "expected": {
+      "normalizedIncludes": ["这个方向可以。", "建议先缩小主题。"],
+      "forbiddenText": ["\n*\n"]
+    }
+  },
+  {
+    "id": "MD-FX-002",
+    "scenario": "general",
+    "surface": "chat_text",
+    "fieldPath": "message.content",
+    "input": "先看结论：\n**\n你更适合做学习成长。",
+    "expected": {
+      "normalizedIncludes": ["先看结论：", "你更适合做学习成长。"],
+      "forbiddenText": ["\n**\n"]
+    }
+  },
+  {
+    "id": "MD-FX-003",
+    "scenario": "general",
+    "surface": "chat_text",
+    "fieldPath": "message.content",
+    "input": "这个选题适合收藏型内容。 *",
+    "expected": {
+      "normalizedIncludes": ["这个选题适合收藏型内容。"],
+      "forbiddenText": [" *"]
+    }
+  },
+  {
+    "id": "MD-FX-004",
+    "scenario": "general",
+    "surface": "chat_text",
+    "fieldPath": "message.content",
+    "input": "*为什么值得追：这个趋势门槛低。",
+    "expected": {
+      "normalizedIncludes": ["为什么值得追", "这个趋势门槛低。"],
+      "forbiddenText": ["*为什么"]
+    }
+  },
+  {
+    "id": "MD-FX-005",
+    "scenario": "general",
+    "surface": "chat_text",
+    "fieldPath": "message.content",
+    "input": "建议优先做 **低成本自律** 方向。",
+    "expected": {
+      "normalizedIncludes": ["**低成本自律**"],
+      "forbiddenText": []
+    }
+  },
+  {
+    "id": "MD-FX-006",
+    "scenario": "general",
+    "surface": "chat_text",
+    "fieldPath": "message.content",
+    "input": "-**优势：**适合新手\n1.**风险：**容易泛化",
+    "status": "pending",
+    "reason": "List marker plus bold-title repair is outside the first-pass Chinese numbering scope.",
+    "expected": {
+      "normalizedIncludes": ["- **优势：**适合新手", "1. **风险：**容易泛化"],
+      "forbiddenText": ["-**", "1.**"]
+    }
+  },
+  {
+    "id": "MD-FX-007",
+    "scenario": "general",
+    "surface": "chat_text",
+    "fieldPath": "message.content",
+    "input": "1、先确定人设\n2、再选题\n3、最后写草稿",
+    "expected": {
+      "normalizedIncludes": ["1. 先确定人设", "2. 再选题", "3. 最后写草稿"],
+      "forbiddenText": ["1、", "2、", "3、"]
+    }
+  },
+  {
+    "id": "MD-FX-008",
+    "scenario": "general",
+    "surface": "chat_text",
+    "fieldPath": "message.content",
+    "input": "（1）标题要具体\n（2）开头要有场景",
+    "expected": {
+      "normalizedIncludes": ["1. 标题要具体", "2. 开头要有场景"],
+      "forbiddenText": ["（1）", "（2）"]
+    }
+  },
+  {
+    "id": "MD-FX-009",
+    "scenario": "general",
+    "surface": "chat_text",
+    "fieldPath": "message.content",
+    "input": "• 低成本\n• 可执行\n• 有反馈",
+    "status": "pending",
+    "reason": "Round two normalize rule: bullet list conversion is intentionally deferred.",
+    "expected": {
+      "normalizedIncludes": ["- 低成本", "- 可执行", "- 有反馈"],
+      "forbiddenText": ["•"]
+    }
+  },
+  {
+    "id": "MD-FX-010",
+    "scenario": "general",
+    "surface": "chat_text",
+    "fieldPath": "message.content",
+    "input": "结论是，先做低成本内容。不要一次塞太多方向。",
+    "expected": {
+      "normalizedIncludes": ["结论是，先做低成本内容。不要一次塞太多方向。"],
+      "forbiddenText": []
+    }
+  },
+  {
+    "id": "MD-FX-011",
+    "scenario": "general",
+    "surface": "chat_text",
+    "fieldPath": "message.content",
+    "input": "这方向可以做。### 为什么值得追：用户有明确痛点",
+    "expected": {
+      "normalizedIncludes": ["这方向可以做。", "### 为什么值得追：", "用户有明确痛点"],
+      "forbiddenText": ["。###"]
+    }
+  },
+  {
+    "id": "MD-FX-012",
+    "scenario": "general",
+    "surface": "chat_text",
+    "fieldPath": "message.content",
+    "input": "为什么值得追：\n低门槛、强共鸣。",
+    "expected": {
+      "normalizedIncludes": ["### 为什么值得追：", "低门槛、强共鸣。"],
+      "forbiddenText": []
+    }
+  },
+  {
+    "id": "MD-FX-013",
+    "scenario": "general",
+    "surface": "chat_text",
+    "fieldPath": "message.content",
+    "input": "```json\n{\"title\":\"低成本自律 *\"}\n```",
+    "expected": {
+      "normalizedIncludes": ["```json\n{\"title\":\"低成本自律 *\"}\n```"],
+      "forbiddenText": []
+    }
+  },
+  {
+    "id": "MD-FX-014",
+    "scenario": "general",
+    "surface": "chat_text",
+    "fieldPath": "message.content",
+    "input": "```\ntitle: test\n```",
+    "expected": {
+      "normalizedIncludes": ["```\ntitle: test\n```"],
+      "forbiddenText": []
+    }
+  },
+  {
+    "id": "MD-FX-015",
+    "scenario": "general",
+    "surface": "chat_text",
+    "fieldPath": "message.content",
+    "input": "| 方向 | 风险 |\n| --- | --- |\n| 自律 | 容易空泛 |",
+    "status": "pending",
+    "reason": "DOM/table checks are planned for the next runner stage.",
+    "expected": {
+      "normalizedIncludes": ["| 方向 | 风险 |", "| 自律 | 容易空泛 |"],
+      "dom": {
+        "requiredSelectors": ["table"]
+      }
+    }
+  },
+  {
+    "id": "MD-FX-016",
+    "scenario": "general",
+    "surface": "chat_text",
+    "fieldPath": "message.content",
+    "input": "- [x] 定标题\n- [ ] 补正文\n- [ ] 加标签",
+    "status": "pending",
+    "reason": "DOM/task-list checks are planned for the next runner stage.",
+    "expected": {
+      "normalizedIncludes": ["- [x] 定标题", "- [ ] 补正文"],
+      "dom": {
+        "requiredSelectors": ["ul", "li"]
+      }
+    }
+  },
+  {
+    "id": "MD-FX-017",
+    "scenario": "content",
+    "surface": "structured_body",
+    "fieldPath": "completeDraft.body[0]",
+    "input": "1、先写痛点\n2、再给方法",
+    "expected": {
+      "normalizedIncludes": ["1. 先写痛点", "2. 再给方法"],
+      "forbiddenText": ["1、", "2、"]
+    }
+  },
+  {
+    "id": "MD-FX-018",
+    "scenario": "content",
+    "surface": "structured_body",
+    "fieldPath": "completeDraft.body[1]",
+    "input": "*\n**方法一：先降低目标**\n每天只做10分钟。",
+    "expected": {
+      "normalizedIncludes": ["**方法一：先降低目标**", "每天只做10分钟。"],
+      "forbiddenText": ["\n*\n"]
+    }
+  },
+  {
+    "id": "MD-FX-019",
+    "scenario": "content",
+    "surface": "structured_body",
+    "fieldPath": "completeDraft.body[2]",
+    "input": "| 时间 | 动作 |\n| --- | --- |\n| 早上 | 写三件事 |",
+    "status": "pending",
+    "reason": "DOM/table checks are planned for the next runner stage.",
+    "expected": {
+      "normalizedIncludes": ["| 时间 | 动作 |", "| 早上 | 写三件事 |"],
+      "dom": {
+        "requiredSelectors": ["table"]
+      }
+    }
+  },
+  {
+    "id": "MD-FX-020",
+    "scenario": "content",
+    "surface": "structured_body",
+    "fieldPath": "completeDraft.body[3]",
+    "input": "- [x] 起标题\n- [ ] 改开头",
+    "status": "pending",
+    "reason": "DOM/task-list checks are planned for the next runner stage.",
+    "expected": {
+      "normalizedIncludes": ["- [x] 起标题", "- [ ] 改开头"],
+      "dom": {
+        "requiredSelectors": ["ul", "li"]
+      }
+    }
+  },
+  {
+    "id": "MD-FX-021",
+    "scenario": "content",
+    "surface": "card_preview",
+    "fieldPath": "completeDraft.cardPreview.keywords",
+    "input": ["低成本自律", "任务拆解", "小红书方法"],
+    "expected": {
+      "type": "stringArray",
+      "maxItems": 3,
+      "maxCharsEach": 14,
+      "forbiddenMarkdownTokens": ["#", "**", "- ", "```"]
+    }
+  },
+  {
+    "id": "MD-FX-022",
+    "scenario": "trend",
+    "surface": "card_preview",
+    "fieldPath": "completeAnalysis.cardPreview",
+    "input": {
+      "discoveryKeywords": ["低成本自律", "早八效率"],
+      "shortTopics": ["大学生如何重启自律", "早八党5分钟出门流程"]
+    },
+    "expected": {
+      "type": "objectStringArrays",
+      "maxItems": 3,
+      "maxCharsEach": 14,
+      "forbiddenMarkdownTokens": ["#", "**", "- ", "```"]
+    }
+  },
+  {
+    "id": "MD-FX-023",
+    "scenario": "persona",
+    "surface": "card_preview",
+    "fieldPath": "personaDraft.cardPreview",
+    "input": {
+      "personaLabel": "成长型学习博主",
+      "baseProfile": "女 · 20 · 大学",
+      "toneLabel": "真诚清爽"
+    },
+    "expected": {
+      "type": "objectStrings",
+      "maxCharsEach": 14,
+      "forbiddenMarkdownTokens": ["#", "**", "- ", "```"]
+    }
+  },
+  {
+    "id": "MD-FX-024",
+    "scenario": "content",
+    "surface": "result_boundary",
+    "fieldPath": "text + completeDraft.body",
+    "input": {
+      "text": "这版可以保存。",
+      "completeDraft": {
+        "body": ["1、先写痛点\n2、再给方法"]
+      }
+    },
+    "expected": {
+      "textNormalizedIncludes": ["这版可以保存。"],
+      "bodyNormalizedIncludes": ["1. 先写痛点", "2. 再给方法"],
+      "forbiddenText": ["1、", "2、"]
+    }
+  },
+  {
+    "id": "MD-FX-025",
+    "scenario": "content",
+    "surface": "card_preview",
+    "fieldPath": "formatted_text_sentence_guard",
+    "status": "pending",
+    "reason": "Backend punctuation-joining regression should be covered by backend-focused tests, not the first-pass frontend markdown runner.",
+    "input": ["低成本自律。", "任务拆解，", "小红书方法"],
+    "expected": {
+      "type": "stringArray",
+      "maxItems": 3,
+      "maxCharsEach": 14,
+      "forbiddenMarkdownTokens": ["#", "**", "- ", "```"]
+    }
+  }
+]

@@ -1,0 +1,11 @@
+{
+  "userId": "demo-user",
+  "preference": "大学生成长赛道最近一周有什么适合做的热点选题",
+  "persona": {
+    "persona": {"name": "大学生成长型学习博主", "description": "以真实校园经验、学习规划和低成本成长方法为核心的人设"},
+    "niche": {"primary": "大学生成长", "secondary": ["学习规划", "考证经验", "生活效率"]},
+    "audience": ["大学生", "考证人群", "想提升效率的新手"],
+    "contentStyle": ["真实", "经验分享", "少说教", "可操作"]
+  },
+  "conversationHistory": []
+}

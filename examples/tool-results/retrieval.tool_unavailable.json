@@ -1,0 +1,8 @@
+{
+  "source": "mock_retrieval",
+  "error": {
+    "code": "TOOL_UNAVAILABLE",
+    "message": "Retrieval tool is not configured."
+  },
+  "items": []
+}

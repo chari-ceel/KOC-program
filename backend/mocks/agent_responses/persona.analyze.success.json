@@ -1,0 +1,21 @@
+{
+  "requestId": "req_mock_persona_analyze",
+  "taskType": "persona.analyze",
+  "platform": "xiaohongshu",
+  "status": "success",
+  "data": {
+    "persona": {
+      "name": "大学生成长规划博主",
+      "niche": "大学生成长",
+      "style": "真实分享",
+      "audience": ["大学生", "备考党"]
+    }
+  },
+  "savePayload": {
+    "type": "persona_profile",
+    "data": {
+      "personaId": "persona_demo_01"
+    }
+  },
+  "warnings": []
+}

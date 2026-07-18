@@ -1,0 +1,16 @@
+__pycache__
+*.pyc
+*.pyo
+.venv
+venv
+.env
+.git
+.gitignore
+.dockerignore
+Dockerfile
+*.md
+!vendor/
+!vendor/wheels/
+!vendor/wheels/.gitkeep
+.pytest_cache
+.mypy_cache

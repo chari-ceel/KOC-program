@@ -1,0 +1,61 @@
+{
+  "requestId": "req_trend_track_002",
+  "taskType": "trend.track",
+  "platform": "xiaohongshu",
+  "status": "partial_success",
+  "data": {
+    "trendSummary": {
+      "period": "7d",
+      "platform": "xiaohongshu",
+      "niche": "大学生成长",
+      "summary": "外部检索工具暂不可用，当前结果基于已保存人设和已有趋势上下文生成。"
+    },
+    "hotTrends": [],
+    "audienceNeeds": [
+      {
+        "need": "快速上手",
+        "evidence": "来自已有 context，不包含实时外部热点",
+        "confidence": "low"
+      }
+    ],
+    "topicOpportunities": [
+      {
+        "title": "大学生第一次考证前要先想清楚的 3 件事",
+        "angle": "保守选题，基于人设和已有上下文生成",
+        "fitReason": "匹配学习规划人设",
+        "difficulty": "low"
+      }
+    ]
+  },
+  "savePayload": {
+    "type": "trend_tracking_result",
+    "suggestedCollection": "trend_tracking_results",
+    "data": {
+      "isPartial": true,
+      "reason": "TOOL_UNAVAILABLE"
+    }
+  },
+  "sources": [],
+  "toolCalls": [
+    {
+      "toolName": "retrieval.search",
+      "toolType": "retrieval",
+      "status": "failed",
+      "error": {
+        "code": "TOOL_UNAVAILABLE",
+        "message": "Search tool is not configured."
+      }
+    }
+  ],
+  "warnings": [
+    {
+      "code": "TOOL_UNAVAILABLE",
+      "message": "当前结果基于已有信息生成，部分外部热点数据暂不可用。"
+    }
+  ],
+  "error": null,
+  "metadata": {
+    "agentVersion": "0.1.0",
+    "durationMs": 700
+  }
+}

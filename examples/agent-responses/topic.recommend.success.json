@@ -1,0 +1,52 @@
+{
+  "requestId": "req_topic_recommend_001",
+  "taskType": "topic.recommend",
+  "platform": "xiaohongshu",
+  "status": "success",
+  "data": {
+    "topics": [
+      {
+        "title": "大学生第一次考证前，我最想知道的 5 件事",
+        "angle": "用真实经历降低新手焦虑",
+        "whyNow": "考证规划和避坑类内容适合收藏",
+        "fitScore": 0.91,
+        "startWritingInput": {
+          "topic": "大学生第一次考证前，我最想知道的 5 件事"
+        }
+      },
+      {
+        "title": "我用一张表把这学期的成长计划拆开了",
+        "angle": "把计划能力变成可复用模板",
+        "whyNow": "模板类内容适合小红书图文收藏",
+        "fitScore": 0.87,
+        "startWritingInput": {
+          "topic": "我用一张表把这学期的成长计划拆开了"
+        }
+      },
+      {
+        "title": "低成本变优秀：大学生可以先做这 7 件小事",
+        "angle": "生活化表达，覆盖更广泛新手受众",
+        "whyNow": "低成本成长类内容适合涨粉",
+        "fitScore": 0.84,
+        "startWritingInput": {
+          "topic": "低成本变优秀：大学生可以先做这 7 件小事"
+        }
+      }
+    ]
+  },
+  "savePayload": {
+    "type": "topic_recommendation",
+    "suggestedCollection": "topic_recommendations",
+    "data": {
+      "topics": []
+    }
+  },
+  "sources": [],
+  "toolCalls": [],
+  "warnings": [],
+  "error": null,
+  "metadata": {
+    "agentVersion": "0.1.0",
+    "durationMs": 1000
+  }
+}

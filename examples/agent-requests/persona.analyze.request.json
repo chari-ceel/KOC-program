@@ -1,0 +1,25 @@
+{
+  "requestId": "req_persona_analyze_001",
+  "taskType": "persona.analyze",
+  "platform": "xiaohongshu",
+  "userId": "demo-user",
+  "input": {
+    "baseInfo": {
+      "gender": "女",
+      "age": 21,
+      "occupation": "大学生",
+      "interests": ["学习", "穿搭", "拍照"],
+      "skills": ["做计划", "整理资料"],
+      "goals": ["涨粉", "记录成长"]
+    }
+  },
+  "context": {
+    "personaHistory": []
+  },
+  "options": {
+    "language": "zh-CN",
+    "mode": "demo",
+    "contentType": "image_text_note",
+    "enableTools": false
+  }
+}

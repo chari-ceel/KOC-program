@@ -1,0 +1,30 @@
+{
+  "requestId": "req_persona_follow_up_001",
+  "taskType": "persona.follow_up",
+  "platform": "xiaohongshu",
+  "userId": "demo-user",
+  "input": {
+    "userMessage": "我比较擅长做计划，也经常帮同学整理考证资料。"
+  },
+  "context": {
+    "baseInfo": {
+      "gender": "女",
+      "age": 21,
+      "occupation": "大学生",
+      "interests": ["学习", "穿搭", "拍照"],
+      "skills": ["做计划", "整理资料"]
+    },
+    "conversationHistory": [
+      {
+        "role": "agent",
+        "content": "你最常被同学咨询的问题是什么？"
+      }
+    ],
+    "personaHistory": []
+  },
+  "options": {
+    "language": "zh-CN",
+    "mode": "demo",
+    "contentType": "image_text_note"
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "requestId": "req_content_draft_002",
+  "taskType": "content.draft",
+  "platform": "xiaohongshu",
+  "status": "failed",
+  "data": null,
+  "savePayload": null,
+  "sources": [],
+  "toolCalls": [],
+  "warnings": [],
+  "error": {
+    "code": "MISSING_CONTEXT",
+    "message": "content.draft requires savedPersona and selectedTopic.",
+    "details": {
+      "missingFields": ["savedPersona", "selectedTopic"],
+      "suggestedRecovery": "请先完成人设打造，并从热门追踪中选择一个选题。"
+    }
+  },
+  "metadata": {
+    "agentVersion": "0.1.0",
+    "durationMs": 120
+  }
+}

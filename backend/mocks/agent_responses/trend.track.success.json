@@ -1,0 +1,17 @@
+{
+  "requestId": "req_mock_trend_track",
+  "taskType": "trend.track",
+  "platform": "xiaohongshu",
+  "status": "success",
+  "data": {
+    "trendSummary": "本周小红书学习类热度上涨",
+    "topicIdeas": ["迎新学习攻略", "考证复盘"]
+  },
+  "savePayload": {
+    "type": "trend_snapshot",
+    "data": {
+      "snapshotId": "trend_demo_01"
+    }
+  },
+  "warnings": []
+}

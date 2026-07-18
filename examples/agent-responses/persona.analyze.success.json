@@ -1,0 +1,61 @@
+{
+  "requestId": "req_persona_analyze_001",
+  "taskType": "persona.analyze",
+  "platform": "xiaohongshu",
+  "status": "success",
+  "data": {
+    "persona": {
+      "name": "大学生成长型学习博主",
+      "description": "以真实校园经验、学习规划和低成本成长方法为核心的人设"
+    },
+    "niche": {
+      "primary": "大学生成长",
+      "secondary": ["学习规划", "考证经验", "生活效率"]
+    },
+    "audience": ["大学生", "考证人群", "想提升效率的新手"],
+    "contentStyle": ["真实", "经验分享", "少说教", "可操作"],
+    "cardPreview": {
+      "personaLabel": "成长学习",
+      "baseProfile": "女 · 21 · 学生",
+      "keywordsLabel": "学习 · 规划",
+      "audienceLabel": "大学生",
+      "toneLabel": "真实实用"
+    },
+    "referenceCreatorDirections": ["大学生成长类博主", "学习规划类博主"],
+    "followUpQuestions": [
+      "你最常被同学咨询的问题是什么？",
+      "你更想分享经验、踩坑记录还是具体教程？"
+    ]
+  },
+  "savePayload": {
+    "type": "persona_result",
+    "suggestedCollection": "persona_results",
+    "data": {
+      "persona": {
+        "name": "大学生成长型学习博主",
+        "description": "以真实校园经验、学习规划和低成本成长方法为核心的人设"
+      },
+      "niche": {
+        "primary": "大学生成长",
+        "secondary": ["学习规划", "考证经验", "生活效率"]
+      },
+      "audience": ["大学生", "考证人群", "想提升效率的新手"],
+      "contentStyle": ["真实", "经验分享", "少说教", "可操作"],
+      "cardPreview": {
+        "personaLabel": "成长学习",
+        "baseProfile": "女 · 21 · 学生",
+        "keywordsLabel": "学习 · 规划",
+        "audienceLabel": "大学生",
+        "toneLabel": "真实实用"
+      }
+    }
+  },
+  "sources": [],
+  "toolCalls": [],
+  "warnings": [],
+  "error": null,
+  "metadata": {
+    "agentVersion": "0.1.0",
+    "durationMs": 900
+  }
+}

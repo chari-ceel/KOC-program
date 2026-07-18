@@ -1,0 +1,59 @@
+{
+  "requestId": "req_content_revise_001",
+  "taskType": "content.revise",
+  "platform": "xiaohongshu",
+  "status": "success",
+  "data": {
+    "revisedDraft": {
+      "titleOptions": [
+        "考证前我踩过的坑，真的不想你再踩一遍",
+        "第一次考证别急着买资料，先看这 5 件事"
+      ],
+      "selectedTitle": "第一次考证别急着买资料，先看这 5 件事",
+      "hook": "我第一次准备考证时，最先做错的一件事就是：资料买了一堆，但计划完全没拆清楚。",
+      "body": "优化后的正文内容",
+      "tags": ["#大学生成长", "#考证规划", "#学习方法"],
+      "ending": "你第一次考证时最担心哪一步？评论区告诉我，我继续整理避坑清单。",
+      "cardPreview": {
+        "keywords": ["考证避坑", "资料选择", "学习方法"]
+      }
+    },
+    "changes": [
+      {
+        "field": "titleOptions",
+        "reason": "增强痛点和点击动机"
+      },
+      {
+        "field": "hook",
+        "reason": "加入第一人称真实经历"
+      }
+    ]
+  },
+  "savePayload": {
+    "type": "content_revision",
+    "suggestedCollection": "content_revisions",
+    "data": {
+      "revisedDraft": {
+        "selectedTitle": "第一次考证别急着买资料，先看这 5 件事",
+        "hook": "我第一次准备考证时，最先做错的一件事就是：资料买了一堆，但计划完全没拆清楚。",
+        "cardPreview": {
+          "keywords": ["考证避坑", "资料选择", "学习方法"]
+        }
+      },
+      "changes": [
+        {
+          "field": "titleOptions",
+          "reason": "增强痛点和点击动机"
+        }
+      ]
+    }
+  },
+  "sources": [],
+  "toolCalls": [],
+  "warnings": [],
+  "error": null,
+  "metadata": {
+    "agentVersion": "0.1.0",
+    "durationMs": 950
+  }
+}

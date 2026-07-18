@@ -1,0 +1,32 @@
+{
+  "requestId": "req_trend_track_001",
+  "taskType": "trend.track",
+  "platform": "xiaohongshu",
+  "userId": "demo-user",
+  "input": {
+    "userPreference": "我想找更容易涨粉的选题",
+    "period": "7d"
+  },
+  "context": {
+    "savedPersona": {
+      "persona": {
+        "name": "大学生成长型学习规划博主"
+      },
+      "niche": {
+        "primary": "大学生成长",
+        "secondary": ["考证规划", "资料整理", "时间管理"]
+      },
+      "audience": ["大学生", "准备考证的新手", "想提升学习效率的人"],
+      "contentStyle": ["真实", "经验分享", "少说教", "可操作"]
+    },
+    "trendHistory": [],
+    "retrievalResults": []
+  },
+  "options": {
+    "language": "zh-CN",
+    "mode": "demo",
+    "contentType": "image_text_note",
+    "enableTools": true,
+    "maxToolCalls": 3
+  }
+}
