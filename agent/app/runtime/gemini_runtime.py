@@ -26,7 +26,7 @@ class GeminiRuntime(ModelRuntime):
         debug_auth = request.options.get("debugAuth", {})
         api_key = ""
         base_url = self.settings.model_base_url
-        model = self.settings.model_name
+        model = self._model_for_request(request)
         if self.settings.enable_debug_auth and isinstance(debug_auth, dict):
             api_key = str(
                 debug_auth.get("modelApiKey")
@@ -44,6 +44,7 @@ class GeminiRuntime(ModelRuntime):
                 debug_auth.get("modelName")
                 or debug_auth.get("googleModel")
                 or debug_auth.get("geminiModel")
+                or debug_auth.get(f"{self._model_role_for_request(request)}Model")
                 or model
             ).strip()
         api_key = api_key or self.settings.model_api_key
@@ -110,6 +111,7 @@ class GeminiRuntime(ModelRuntime):
                 "mockResponse": False,
                 "modelProvider": "openai_compatible",
                 "model": model,
+                "modelRole": self._model_role_for_request(request),
                 "baseUrl": self._chat_completions_url(base_url),
                 "promptLoaded": bool(prompt),
                 "durationMs": int((time.perf_counter() - started) * 1000),
@@ -125,7 +127,7 @@ class GeminiRuntime(ModelRuntime):
         debug_auth = request.options.get("debugAuth", {})
         api_key = ""
         base_url = self.settings.model_base_url
-        model = self.settings.model_name
+        model = self._model_for_request(request)
         if self.settings.enable_debug_auth and isinstance(debug_auth, dict):
             api_key = str(
                 debug_auth.get("modelApiKey")
@@ -143,6 +145,7 @@ class GeminiRuntime(ModelRuntime):
                 debug_auth.get("modelName")
                 or debug_auth.get("googleModel")
                 or debug_auth.get("geminiModel")
+                or debug_auth.get(f"{self._model_role_for_request(request)}Model")
                 or model
             ).strip()
         api_key = api_key or self.settings.model_api_key
@@ -213,6 +216,22 @@ class GeminiRuntime(ModelRuntime):
             },
             timeoutMs=request.options.get("webSearchTimeoutMs", 15000),
         )
+
+    def _model_role_for_request(self, request: AgentRunRequest) -> str:
+        role = str(request.options.get("modelRole") or "").strip().lower()
+        return role or "default"
+
+    def _model_for_request(self, request: AgentRunRequest) -> str:
+        role = self._model_role_for_request(request)
+        role_model = {
+            "main": self.settings.model_role_main,
+            "search": self.settings.model_role_search,
+            "trend": self.settings.model_role_trend,
+            "content": self.settings.model_role_content,
+            "persona": self.settings.model_role_persona,
+            "lightweight": self.settings.model_role_lightweight,
+        }.get(role, "")
+        return (role_model or self.settings.model_name).strip()
 
     def _schema_for_task(self, request: AgentRunRequest) -> dict[str, Any]:
         if request.task_type == "persona.analyze":

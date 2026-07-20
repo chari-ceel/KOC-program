@@ -10,6 +10,7 @@ def build_agent_options(**overrides: Any) -> dict[str, Any]:
     options: dict[str, Any] = {
         "runtimeProvider": settings.agent_runtime_provider,
         "enableTools": settings.agent_enable_tools,
+        "debugAgentTrace": settings.agent_debug_trace,
     }
     for key, value in overrides.items():
         if value is not None:

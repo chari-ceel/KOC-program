@@ -187,6 +187,12 @@ function HomeContent() {
   const showCenteredHomeLayout = !isDialogPage && chatHistory.length === 0;
   const showDialogLandingLayout = isDialogPage && chatHistory.length === 0;
 
+  useEffect(() => {
+    if (isDialogPage) {
+      router.replace('/manual');
+    }
+  }, [isDialogPage, router]);
+
   const applyStoredChatState = useCallback((restoreScroll = false) => {
     if (!homeChatStorageKeys) return;
     const storedChatState = readStoredHomeChatState(homeChatStorageKeys);
@@ -496,9 +502,13 @@ function HomeContent() {
     }
     clearConversationId(DIALOG_CONVERSATION_ID_STORAGE_KEY);
     if (!isDialogPage) {
-      router.push('/?view=dialog');
+      router.push('/manual');
     }
   };
+
+  if (isDialogPage) {
+    return null;
+  }
 
   const chatHeaderAction = (
     <div className="flex shrink-0 flex-wrap items-center gap-3 self-start sm:self-center sm:justify-end">

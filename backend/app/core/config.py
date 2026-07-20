@@ -15,7 +15,8 @@ def _read_bool(name: str, default: bool) -> bool:
 @dataclass(frozen=True)
 class BackendSettings:
     agent_runtime_provider: str = "model"
-    agent_enable_tools: bool = False
+    agent_enable_tools: bool = True
+    agent_debug_trace: bool = False
     memory_model_api_key: str = ""
     memory_model_base_url: str = ""
     memory_model_name: str = ""
@@ -26,7 +27,8 @@ def get_backend_settings() -> BackendSettings:
     runtime_provider = os.getenv("AGENT_RUNTIME_PROVIDER", "model").strip() or "model"
     return BackendSettings(
         agent_runtime_provider=runtime_provider,
-        agent_enable_tools=_read_bool("AGENT_ENABLE_TOOLS", False),
+        agent_enable_tools=_read_bool("AGENT_ENABLE_TOOLS", True),
+        agent_debug_trace=_read_bool("AGENT_DEBUG_TRACE", False),
         memory_model_api_key=os.getenv("MEMORY_MODEL_API_KEY", "").strip(),
         memory_model_base_url=os.getenv("MEMORY_MODEL_BASE_URL", "https://open.bigmodel.cn/api/paas/v4").strip(),
         memory_model_name=os.getenv("MEMORY_MODEL_NAME", "glm-4.5-flash").strip(),
