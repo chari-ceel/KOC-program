@@ -105,6 +105,13 @@ class FakeMemoryCRUD:
         ]
         return candidates[-1] if candidates else None
 
+    def list_agent_module_memories(self, user_id: str, conversation_id: str, module: str, limit: int = 50):
+        return [
+            memory
+            for (memory_user, memory_conversation, _), memory in self.memories.items()
+            if memory_user == user_id and memory_conversation == conversation_id and memory["module"] == module
+        ][:limit]
+
 
 class FakePersonaService:
     async def analyze(self, user_id: str, basic_info: dict, persist: bool = True, agent_debug=None):
@@ -229,6 +236,51 @@ async def test_progresses_to_content_and_binds_parent_memories():
         "persona_memory_id": first["memory_refs"]["persona_memory_id"],
         "trending_memory_id": second["memory_refs"]["trending_memory_id"],
     }
+    assert third["summary"]["content"]["items"][0]["memory_id"] == third["memory_refs"]["content_memory_id"]
+
+
+@pytest.mark.anyio
+async def test_new_content_request_keeps_previous_content_items():
+    memory = FakeMemoryCRUD()
+    service = build_service(memory)
+
+    first = await service.chat(user_id="user-a", message="我是美妆博主")
+    await service.chat(user_id="user-a", conversation_id=first["conversation_id"], message="推荐选题")
+    first_content = await service.chat(user_id="user-a", conversation_id=first["conversation_id"], message="帮我写正文")
+    second_content = await service.chat(
+        user_id="user-a",
+        conversation_id=first["conversation_id"],
+        message="再写一篇新的",
+    )
+
+    items = second_content["summary"]["content"]["items"]
+    assert len(items) == 2
+    assert items[0]["memory_id"] == first_content["memory_refs"]["content_memory_id"]
+    assert items[0]["message_id"] == first_content["assistant_message"]["id"]
+    assert items[0]["active"] is False
+    assert items[1]["memory_id"] == second_content["memory_refs"]["content_memory_id"]
+    assert items[1]["message_id"] == second_content["assistant_message"]["id"]
+    assert items[1]["active"] is True
+    assert first_content["memory_refs"]["content_memory_id"] != second_content["memory_refs"]["content_memory_id"]
+
+
+@pytest.mark.anyio
+async def test_conversation_detail_returns_messages_and_content_items():
+    memory = FakeMemoryCRUD()
+    service = build_service(memory)
+
+    first = await service.chat(user_id="user-a", message="我是美妆博主")
+    await service.chat(user_id="user-a", conversation_id=first["conversation_id"], message="推荐选题")
+    await service.chat(user_id="user-a", conversation_id=first["conversation_id"], message="帮我写正文")
+    await service.chat(user_id="user-a", conversation_id=first["conversation_id"], message="再写一篇新的")
+
+    detail = service.get_conversation(user_id="user-a", conversation_id=first["conversation_id"])
+
+    assert detail is not None
+    assert detail["conversation_id"] == first["conversation_id"]
+    assert len(detail["messages"]) == 8
+    assert len(detail["summary"]["content"]["items"]) == 2
+    assert detail["summary"]["content"]["items"][1]["active"] is True
 
 
 @pytest.mark.anyio

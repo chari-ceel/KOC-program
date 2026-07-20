@@ -32,6 +32,7 @@ class MemoryCRUD:
         memory_db.agent_chat_messages.create_index([("user_id", 1), ("conversation_id", 1), ("message_id", 1)], unique=True)
         memory_db.agent_module_memories.create_index([("user_id", 1), ("conversation_id", 1), ("memory_id", 1)], unique=True)
         memory_db.agent_module_memories.create_index([("user_id", 1), ("conversation_id", 1), ("module", 1), ("updated_at", -1)])
+        memory_db.agent_module_memories.create_index([("user_id", 1), ("conversation_id", 1), ("module", 1), ("created_at", 1)])
 
     def get_agent_chat_conversation(self, user_id: str, conversation_id: str) -> Optional[Dict[str, Any]]:
         return memory_db.agent_chat_conversations.find_one(
@@ -166,6 +167,22 @@ class MemoryCRUD:
             {"user_id": user_id, "conversation_id": conversation_id, "module": module},
             {"_id": 0},
             sort=[("updated_at", -1)],
+        )
+
+    def list_agent_module_memories(
+        self,
+        user_id: str,
+        conversation_id: str,
+        module: str,
+        limit: int = 50,
+    ) -> List[Dict[str, Any]]:
+        return list(
+            memory_db.agent_module_memories.find(
+                {"user_id": user_id, "conversation_id": conversation_id, "module": module},
+                {"_id": 0},
+            )
+            .sort("created_at", 1)
+            .limit(limit)
         )
 
     def delete_agent_chat_user_data(self, user_id: str) -> None:

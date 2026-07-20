@@ -1,6 +1,6 @@
 from typing import Literal, Optional
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from ...services.agent_chat import UnifiedAgentChatService
@@ -49,3 +49,15 @@ async def list_agent_chat_conversations(
 ):
     user_id = current_user.user_id if current_user else "demo-user"
     return service.list_conversations(user_id=user_id, limit=limit)
+
+
+@router.get("/conversations/{conversation_id}")
+async def get_agent_chat_conversation(
+    conversation_id: str,
+    current_user: AuthenticatedUser | None = Depends(get_current_user),
+):
+    user_id = current_user.user_id if current_user else "demo-user"
+    conversation = service.get_conversation(user_id=user_id, conversation_id=conversation_id)
+    if not conversation:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    return conversation
