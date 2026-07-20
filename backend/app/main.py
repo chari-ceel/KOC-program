@@ -10,6 +10,7 @@ from .endpoints.web.persona import router as persona_router
 from .endpoints.web.trends import router as trends_router
 from .endpoints.web.content import router as content_router
 from .endpoints.web.chat import router as chat_router
+from .endpoints.web.agent_chat import router as agent_chat_router
 from .endpoints.web.debug import router as debug_router
 from .database import client
 
@@ -46,6 +47,7 @@ app.include_router(persona_router)
 app.include_router(trends_router)
 app.include_router(content_router)
 app.include_router(chat_router)
+app.include_router(agent_chat_router)
 app.include_router(debug_router)
 app.include_router(auth_router)
 app.include_router(analytics_router)
