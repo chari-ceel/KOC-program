@@ -91,7 +91,7 @@ function readInitialCollapsed(pathname: string) {
   if (stored === 'true') return true;
   if (stored === 'false') return false;
 
-  return pathname === '/' && !window.location.search.includes('view=dialog');
+  return pathname === '/';
 }
 
 function persistCollapsedState(isCollapsed: boolean) {
@@ -244,7 +244,7 @@ function SidebarInner({ pathname }: { pathname: string }) {
         >
           <Image src="/koc-assets/icons/图标/收缩.svg" alt="" width={34} height={34} className={navIconClassName} />
         </button>
-        <Link href="/?view=dialog" aria-label="灵光" title="灵光" className={`koc-icon-center ${navIconClassName}`}>
+        <Link href="/manual" aria-label="用户说明书" title="用户说明书" className={`koc-icon-center ${navIconClassName}`}>
           <Image src="/koc-assets/icons/图标/灵光一闪.svg" alt="" width={34} height={34} className="size-[56px] shrink-0" />
         </Link>
       </div>

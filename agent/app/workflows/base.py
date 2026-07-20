@@ -1,5 +1,6 @@
 from app.core.config import get_settings
 from app.core.errors import MISSING_CONTEXT, MODEL_PROVIDER_UNAVAILABLE, failed_response
+from app.orchestration.agent_orchestrator import AgentOrchestrator
 from app.prompts.loader import PromptLoader
 from app.runtime.base import ModelRuntime
 from app.runtime.gemini_runtime import GeminiRuntime
@@ -14,16 +15,27 @@ class BaseWorkflow:
     def __init__(self, runtime: ModelRuntime | None = None) -> None:
         self.runtime = runtime
         self.prompt_loader = PromptLoader()
+        self.orchestrator = AgentOrchestrator()
 
     def generate_response(self, request: AgentRunRequest) -> AgentRunResponse:
         runtime = self._runtime_for_request(request)
         if runtime is None:
             return self.model_provider_unavailable(request)
-        return runtime.generate(
-            request,
+        plan = self.orchestrator.plan(request)
+        role_request = self.orchestrator.with_model_role(request, plan.worker_role)
+        response = runtime.generate(
+            role_request,
             prompt=self._prompt_for_request(request),
-            variables=self._variables_for_request(request),
+            variables=self._variables_for_request(role_request),
         )
+        if response.status != "failed":
+            response.metadata["modelRole"] = plan.worker_role
+            response.metadata["webSearchDecision"] = "disabled"
+            response.metadata["subAgentTrace"] = self.orchestrator.trace_metadata(
+                plan,
+                web_search_decision="disabled",
+            )
+        return response
 
     def generate_with_optional_retrieval(
         self,
@@ -35,18 +47,42 @@ class BaseWorkflow:
         if runtime is None:
             return self.model_provider_unavailable(request)
 
+        plan = self.orchestrator.plan(request)
         prompt = self._prompt_for_request(request)
         variables = self._variables_for_request(request)
         retrieval_result: RetrievalToolResult | None = None
         tool_calls: list[ToolCall] = []
-        final_request = request
+        final_request = self.orchestrator.with_model_role(request, plan.worker_role)
+        web_search_decision = "disabled"
+        retrieval_reason = ""
 
         if request.options.get("enableTools", True):
+            web_search_decision = "skipped_by_agent"
+            search_request = self.orchestrator.with_model_role(request, plan.search_role)
             retrieval_request = runtime.decide_retrieval(
-                request,
+                search_request,
                 prompt=prompt,
                 variables=variables,
             )
+            if retrieval_request is None and plan.force_retrieval:
+                query = self.orchestrator.deterministic_retrieval_query(request)
+                if query:
+                    retrieval_request = RetrievalToolRequest(
+                        source="web_search",
+                        query=query,
+                        platform=request.platform,
+                        limit=request.options.get("maxToolCalls", 3) or 3,
+                        filters={
+                            "contentType": request.options.get("contentType", "image_text_note"),
+                            "language": request.options.get("language", "zh-CN"),
+                            "debugAuth": request.options.get("debugAuth", {}),
+                            "decisionReason": "forced_by_task_policy",
+                        },
+                        timeoutMs=request.options.get("webSearchTimeoutMs", 15000),
+                    )
+            if retrieval_request is not None:
+                retrieval_reason = str((retrieval_request.filters or {}).get("decisionReason") or "").strip()
+                web_search_decision = "attempted"
             if retrieval_request is not None:
                 retrieval_request = self._normalize_retrieval_request(
                     request,
@@ -59,7 +95,7 @@ class BaseWorkflow:
                 if retrieval_result.status != "success":
                     return self._real_research_failed(request, tool_calls)
                 final_request = self._request_with_retrieval_context(
-                    request,
+                    final_request,
                     retrieval_result,
                     tool_calls,
                 )
@@ -76,9 +112,9 @@ class BaseWorkflow:
             return response
 
         if retrieval_result is None:
-            response.metadata["webSearchDecision"] = (
-                "skipped_by_agent" if request.options.get("enableTools", True) else "disabled"
-            )
+            response.metadata["modelRole"] = plan.worker_role
+            response.metadata["webSearchDecision"] = web_search_decision
+            response.metadata["subAgentTrace"] = self.orchestrator.trace_metadata(plan, web_search_decision=web_search_decision, retrieval_reason=retrieval_reason)
             return response
 
         response.tool_calls = [call.model_dump(mode="json") for call in tool_calls]
@@ -86,7 +122,9 @@ class BaseWorkflow:
             source.model_dump(mode="json") for source in result_to_sources(retrieval_result)
         ]
         response.metadata[metadata_key] = retrieval_result.source
+        response.metadata["modelRole"] = plan.worker_role
         response.metadata["webSearchDecision"] = "used"
+        response.metadata["subAgentTrace"] = self.orchestrator.trace_metadata(plan, web_search_decision="used", retrieval_source=retrieval_result.source, retrieval_reason=retrieval_reason)
         return response
 
     def _normalize_retrieval_request(
@@ -280,4 +318,6 @@ class BaseWorkflow:
             },
         )
         response.tool_calls = [call.model_dump(mode="json") for call in tool_calls]
+        response.metadata["modelRole"] = self.orchestrator.plan(request).worker_role
+        response.metadata["webSearchDecision"] = "failed"
         return response

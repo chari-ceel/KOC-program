@@ -23,8 +23,14 @@ class Settings(BaseSettings):
         default="gemini-2.5-flash",
         validation_alias=AliasChoices("MODEL_NAME", "GOOGLE_MODEL"),
     )
-    model_request_timeout_seconds: int = Field(default=30, alias="MODEL_REQUEST_TIMEOUT_SECONDS")
+    model_request_timeout_seconds: int = Field(default=90, alias="MODEL_REQUEST_TIMEOUT_SECONDS")
     model_request_max_attempts: int = Field(default=2, alias="MODEL_REQUEST_MAX_ATTEMPTS")
+    model_role_main: str = Field(default="", alias="MODEL_ROLE_MAIN")
+    model_role_search: str = Field(default="", alias="MODEL_ROLE_SEARCH")
+    model_role_trend: str = Field(default="", alias="MODEL_ROLE_TREND")
+    model_role_content: str = Field(default="", alias="MODEL_ROLE_CONTENT")
+    model_role_persona: str = Field(default="", alias="MODEL_ROLE_PERSONA")
+    model_role_lightweight: str = Field(default="", alias="MODEL_ROLE_LIGHTWEIGHT")
     agent_runtime_mode: str = Field(default="model", alias="AGENT_RUNTIME_MODE")
     enable_debug_auth: bool = Field(default=True, alias="ENABLE_DEBUG_AUTH")
 

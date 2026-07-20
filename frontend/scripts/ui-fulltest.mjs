@@ -54,23 +54,16 @@ async function run() {
   const user = randomUser();
 
   try {
-    await open(page, `${BASE_URL}/?view=dialog`);
-    await shot(page, "01-dialog-open");
-    r.pass("dialog.open", "1.2 灵光一闪");
-
-    const dialogInput = page.locator('input[placeholder*="灵光一闪"]').first();
-    await dialogInput.fill("你好，给我3个大学生成长账号方向");
-    await page.getByRole("button", { name: "发送" }).first().click();
-    await page.waitForTimeout(2500);
-    await shot(page, "02-dialog-send-1");
-    await dialogInput.fill("第二个方向展开一点");
-    await page.getByRole("button", { name: "发送" }).first().click();
-    await page.waitForTimeout(2500);
-    await shot(page, "03-dialog-send-2");
-    r.pass("dialog.multi_turn", "1.2 灵光一闪", "未登录可多轮聊天");
-    r.pass("dialog.no_save_entry", "1.4 输出内容测试", "页面未出现保存入口按钮");
+    await open(page, `${BASE_URL}/manual`);
+    await shot(page, "01-manual-open");
+    const manualTitle = page.getByRole("heading", { name: "用户说明书" }).first();
+    if (await manualTitle.isVisible().catch(() => false)) {
+      r.pass("manual.open", "1.2 用户说明书", "临时聊天入口已替换为说明书页面");
+    } else {
+      r.fail("manual.open", "1.2 用户说明书", "未看到说明书标题");
+    }
   } catch (e) {
-    r.fail("dialog.flow", "1.2 灵光一闪", String(e));
+    r.fail("manual.flow", "1.2 用户说明书", String(e));
   }
 
   try {
