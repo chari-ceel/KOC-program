@@ -100,7 +100,7 @@ function LoginPageContent() {
     <div className="flex min-h-full w-full items-center justify-center px-[5.5vw] py-10">
       <AuthPanelShell
         title={mode === 'login' ? '顶流养成计划 · 登录' : '顶流养成计划 · 注册'}
-        titleClassName="text-[34px]"
+        titleClassName="text-[28px]"
       >
         <div className="sr-only">
           <h1>{mode === 'login' ? '顶流养成计划 · 登录' : '顶流养成计划 · 注册'}</h1>
@@ -213,7 +213,7 @@ function LoginPageContent() {
           <button
             type="submit"
             disabled={isSubmitting}
-            className="koc-heading-font h-[58px] w-full rounded-full border border-[#888888] bg-[#DE868F] px-7 text-[24px] text-white shadow-[var(--cta-shadow)] transition hover:opacity-92 disabled:opacity-55"
+            className="koc-heading-font h-[56px] w-full rounded-[12px] border border-[var(--box-border)] bg-[var(--primary)] px-7 text-[24px] text-white shadow-[var(--cta-shadow)] transition hover:bg-[var(--primary-hover)] disabled:opacity-55"
           >
             {isSubmitting ? '提交中…' : mode === 'login' ? '登录' : '注册'}
           </button>

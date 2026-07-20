@@ -52,12 +52,20 @@ const promptDebugItem: SidebarGroupItem = {
   ],
 };
 
-const AVATAR_OPTIONS = ['梨', '星', '花', '云', '光', '心'];
 const AVATAR_UPLOAD_MAX_BYTES = 200 * 1024;
+const AVATAR_PREVIEW_SIZE = 256;
 
-function normalizeAvatarInput(value: string) {
-  return Array.from(value.trim()).slice(0, 2).join('');
-}
+type AvatarTransform = {
+  x: number;
+  y: number;
+  scale: number;
+};
+
+const DEFAULT_AVATAR_TRANSFORM: AvatarTransform = {
+  x: 0,
+  y: 0,
+  scale: 1,
+};
 
 function isImageAvatar(value?: string): value is string {
   return Boolean(value?.startsWith('data:image/'));
@@ -78,6 +86,40 @@ function AvatarBadge({ value, size = 'md' }: { value?: string; size?: 'sm' | 'md
       {isImageAvatar(value) ? <Image src={value} alt="" width={56} height={56} unoptimized className="size-full object-cover" /> : value || '梨'}
     </span>
   );
+}
+
+async function transformAvatarPreview(source: string, transform: AvatarTransform) {
+  return await new Promise<string>((resolve, reject) => {
+    const image = new window.Image();
+    image.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = AVATAR_PREVIEW_SIZE;
+      canvas.height = AVATAR_PREVIEW_SIZE;
+      const context = canvas.getContext('2d');
+      if (!context) {
+        reject(new Error('头像预览不可用'));
+        return;
+      }
+
+      context.fillStyle = '#ffffff';
+      context.fillRect(0, 0, AVATAR_PREVIEW_SIZE, AVATAR_PREVIEW_SIZE);
+      context.save();
+      context.beginPath();
+      context.arc(AVATAR_PREVIEW_SIZE / 2, AVATAR_PREVIEW_SIZE / 2, AVATAR_PREVIEW_SIZE / 2, 0, Math.PI * 2);
+      context.clip();
+
+      const baseScale = Math.min(AVATAR_PREVIEW_SIZE / image.width, AVATAR_PREVIEW_SIZE / image.height);
+      const drawWidth = image.width * baseScale * transform.scale;
+      const drawHeight = image.height * baseScale * transform.scale;
+      const centerX = AVATAR_PREVIEW_SIZE / 2 + transform.x;
+      const centerY = AVATAR_PREVIEW_SIZE / 2 + transform.y;
+      context.drawImage(image, centerX - drawWidth / 2, centerY - drawHeight / 2, drawWidth, drawHeight);
+      context.restore();
+      resolve(canvas.toDataURL('image/jpeg', 0.92));
+    };
+    image.onerror = () => reject(new Error('头像图片读取失败'));
+    image.src = source;
+  });
 }
 
 function readInitialCollapsed(pathname: string) {
@@ -120,6 +162,8 @@ function SidebarInner({ pathname }: { pathname: string }) {
   const [isCollapsed, setIsCollapsed] = useState(() => readInitialCollapsed(pathname));
   const [profileNameDraft, setProfileNameDraft] = useState('');
   const [profileAvatarDraft, setProfileAvatarDraft] = useState('梨');
+  const [profileAvatarSource, setProfileAvatarSource] = useState('');
+  const [profileAvatarTransform, setProfileAvatarTransform] = useState<AvatarTransform>(DEFAULT_AVATAR_TRANSFORM);
   const [profileNotice, setProfileNotice] = useState('');
   const [isProfileSaving, setIsProfileSaving] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
@@ -153,10 +197,12 @@ function SidebarInner({ pathname }: { pathname: string }) {
   const currentAccountId = getUserAccountId(user);
   const currentAccountName = getUserAccountName(user);
   const navIconClassName = 'size-[34px] shrink-0';
+  const sidebarIconFilter = 'var(--primary-icon-filter)';
+  const sidebarIconStyle = { filter: sidebarIconFilter };
   const userModuleActive = isAuthenticated ? isUserMenuOpen : authDialog.open;
   const userModuleClassName = userModuleActive
-    ? 'border-[var(--box-border)] bg-[rgba(255,255,255,0.43)] text-[var(--foreground)] shadow-[var(--box-shadow)]'
-    : 'border-transparent bg-transparent text-[var(--foreground)] hover:border-[var(--box-border)] hover:bg-[rgba(255,255,255,0.62)] hover:shadow-[var(--box-shadow)]';
+    ? 'border-[var(--box-border)] bg-[var(--nav-active)] text-[var(--foreground)] shadow-[var(--box-shadow)]'
+    : 'border-transparent bg-transparent text-[var(--foreground)] hover:border-[var(--box-border)] hover:bg-[var(--nav-hover)] hover:shadow-[var(--box-shadow)]';
 
   const updateCollapsed = (value: boolean | ((current: boolean) => boolean)) => {
     setIsCollapsed((current) => {
@@ -184,8 +230,11 @@ function SidebarInner({ pathname }: { pathname: string }) {
   useEffect(() => {
     if (!isUserMenuOpen || !user) return;
     const timer = window.setTimeout(() => {
+      const nextAvatar = user.avatar || '梨';
       setProfileNameDraft(user.name || user.email || user.username || '');
-      setProfileAvatarDraft(user.avatar || '梨');
+      setProfileAvatarDraft(nextAvatar);
+      setProfileAvatarSource(isImageAvatar(nextAvatar) ? nextAvatar : '');
+      setProfileAvatarTransform(DEFAULT_AVATAR_TRANSFORM);
       setProfileNotice('');
     }, 0);
     return () => window.clearTimeout(timer);
@@ -198,13 +247,24 @@ function SidebarInner({ pathname }: { pathname: string }) {
   const renderNavIcon = (item: SidebarItem) => {
     if (item.iconEmoji) {
       return (
-        <span aria-hidden="true" className={`${navIconClassName} flex items-center justify-center text-[28px] leading-none`}>
+        <span aria-hidden="true" className={`${navIconClassName} flex items-center justify-center text-[28px] leading-none text-[var(--foreground)]`}>
           {item.iconEmoji}
         </span>
       );
     }
     if (!item.iconSrc) return null;
-    return <Image src={item.iconSrc} alt="" width={34} height={34} className={navIconClassName} />;
+    return <Image src={item.iconSrc} alt="" width={34} height={34} className={navIconClassName} style={sidebarIconStyle} />;
+  };
+
+  const applyAvatarTransform = async (nextTransform: AvatarTransform, source = profileAvatarSource) => {
+    if (!source) return;
+    setProfileAvatarTransform(nextTransform);
+    try {
+      setProfileAvatarDraft(await transformAvatarPreview(source, nextTransform));
+      setProfileNotice('');
+    } catch (error) {
+      setProfileNotice(error instanceof Error ? error.message : '头像调整失败');
+    }
   };
 
   const handleProfileAvatarUpload = (file: File | undefined) => {
@@ -220,6 +280,9 @@ function SidebarInner({ pathname }: { pathname: string }) {
     const reader = new FileReader();
     reader.onload = () => {
       if (typeof reader.result === 'string') {
+        const nextTransform = DEFAULT_AVATAR_TRANSFORM;
+        setProfileAvatarSource(reader.result);
+        setProfileAvatarTransform(nextTransform);
         setProfileAvatarDraft(reader.result);
         setProfileNotice('');
       }
@@ -230,33 +293,34 @@ function SidebarInner({ pathname }: { pathname: string }) {
 
   return (
     <aside
-      className={`z-30 flex h-full shrink-0 flex-col overflow-visible rounded-[26px] border border-[var(--box-border)] bg-[var(--sidebar)] shadow-[var(--box-shadow)] transition-[width] duration-300 ${
+      className={`koc-sidebar-root z-30 flex h-full shrink-0 flex-col overflow-visible rounded-[18px] border border-[var(--box-border)] bg-[var(--sidebar)] shadow-[var(--box-shadow)] transition-[width] duration-300 ${
         isCollapsed ? 'w-[84px]' : 'w-[274px]'
       }`}
     >
-      <div className={`flex items-center px-8 pt-6 ${isCollapsed ? 'flex-col gap-4 px-4' : 'gap-8'}`}>
-        <button
-          type="button"
-          aria-label={isCollapsed ? '展开侧边栏' : '收起侧边栏'}
-          title={isCollapsed ? '展开' : '收起'}
-          onClick={() => updateCollapsed((current) => !current)}
-          className={`koc-icon-center ${navIconClassName}`}
-        >
-          <Image src="/koc-assets/icons/图标/收缩.svg" alt="" width={34} height={34} className={navIconClassName} />
-        </button>
-        <Link href="/manual" aria-label="用户说明书" title="用户说明书" className={`koc-icon-center ${navIconClassName}`}>
-          <Image src="/koc-assets/icons/图标/灵光一闪.svg" alt="" width={34} height={34} className="size-[56px] shrink-0" />
-        </Link>
+      <div className={`flex px-4 pt-6 ${isCollapsed ? 'flex-col items-center gap-4' : 'items-start gap-3'}`}>
+        {!isCollapsed && (
+          <Link href="/" className="koc-title-font min-w-0 flex-1 pl-1 text-left text-[22px] leading-none text-[var(--foreground)]">
+            <span className="flex flex-col gap-1 whitespace-nowrap">
+              <span>顶流养成计划</span>
+              <span>Agent</span>
+            </span>
+          </Link>
+        )}
+        <div className={`flex shrink-0 items-center ${isCollapsed ? 'flex-col gap-4' : 'gap-2 pt-1'}`}>
+          <button
+            type="button"
+            aria-label={isCollapsed ? '展开侧边栏' : '收起侧边栏'}
+            title={isCollapsed ? '展开' : '收起'}
+            onClick={() => updateCollapsed((current) => !current)}
+            className="koc-icon-center size-[28px]"
+          >
+            <Image src="/koc-assets/icons/图标/收缩.svg" alt="" width={28} height={28} className="size-[28px] shrink-0" style={sidebarIconStyle} />
+          </button>
+          <Link href="/manual" aria-label="用户说明书" title="用户说明书" className="koc-icon-center size-[28px]">
+            <Image src="/koc-assets/icons/图标/灵光一闪.svg" alt="" width={30} height={30} className="size-[30px] shrink-0" style={sidebarIconStyle} />
+          </Link>
+        </div>
       </div>
-
-      {!isCollapsed && (
-        <Link href="/" className="koc-title-font mt-6 block pl-3 pr-8 text-center text-[28px] leading-none text-[var(--title-blue)]">
-          <span className="flex flex-col items-center justify-center gap-1">
-            <span>顶流养成计划</span>
-            <span>Agent</span>
-          </span>
-        </Link>
-      )}
 
       <nav className="mt-7 flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4">
         {visibleMenuItems.map((item) => {
@@ -279,8 +343,8 @@ function SidebarInner({ pathname }: { pathname: string }) {
                   }}
                   className={`flex min-h-[54px] w-full items-center gap-3 rounded-[22px] border text-[21px] transition ${
                     active
-                      ? 'border-[var(--box-border)] bg-[rgba(255,255,255,0.43)] text-[var(--foreground)] shadow-[var(--box-shadow)]'
-                      : 'border-transparent bg-transparent text-[var(--foreground)] hover:bg-[rgba(255,255,255,0.62)]'
+                      ? 'border-[var(--box-border)] bg-[var(--nav-active)] text-[var(--foreground)] shadow-[var(--box-shadow)]'
+                      : 'border-transparent bg-transparent text-[var(--foreground)] hover:bg-[var(--nav-hover)]'
                   } ${isCollapsed ? 'justify-center px-0' : 'px-4'}`}
                 >
                   {renderNavIcon(item)}
@@ -302,8 +366,8 @@ function SidebarInner({ pathname }: { pathname: string }) {
                           href={child.href}
                           className={`flex min-h-10 items-center rounded-[12px] px-4 py-2 text-[15px] transition ${
                             childActive
-                              ? 'border border-[var(--box-border)] bg-[rgba(255,255,255,0.43)] font-semibold text-[var(--foreground)] shadow-[var(--box-shadow)]'
-                              : 'text-[var(--foreground)] hover:bg-[rgba(255,255,255,0.6)]'
+                              ? 'border border-[var(--box-border)] bg-[var(--nav-active)] font-semibold text-[var(--foreground)] shadow-[var(--box-shadow)]'
+                              : 'text-[var(--foreground)] hover:bg-[var(--nav-hover)]'
                           }`}
                         >
                           {child.label}
@@ -318,8 +382,8 @@ function SidebarInner({ pathname }: { pathname: string }) {
 
           const leafClassName = `flex min-h-[54px] items-center gap-3 rounded-[22px] border text-[21px] transition ${
             active
-              ? 'border-[var(--box-border)] bg-[rgba(255,255,255,0.43)] text-[var(--foreground)] shadow-[var(--box-shadow)]'
-              : 'border-transparent bg-transparent text-[var(--foreground)] hover:bg-[rgba(255,255,255,0.62)]'
+              ? 'border-[var(--box-border)] bg-[var(--nav-active)] text-[var(--foreground)] shadow-[var(--box-shadow)]'
+              : 'border-transparent bg-transparent text-[var(--foreground)] hover:bg-[var(--nav-hover)]'
           } ${isCollapsed ? 'justify-center px-0' : 'px-4'}`;
           const leafContent = (
             <>
@@ -362,7 +426,7 @@ function SidebarInner({ pathname }: { pathname: string }) {
       <div ref={userModuleRef} className={`relative z-40 mt-auto flex h-[96px] shrink-0 items-center overflow-visible ${isCollapsed ? 'justify-center px-0' : 'px-4'}`}>
         {isAuthenticated && isUserMenuOpen && (
           <div
-            className={`absolute z-50 w-[312px] rounded-[18px] border border-[var(--box-border)] bg-[rgba(255,255,255,0.98)] px-4 py-4 text-sm text-[var(--foreground)] shadow-[var(--box-shadow)] ${isCollapsed ? 'bottom-2 left-[72px]' : 'bottom-[88px] left-4'}`}
+            className={`absolute z-50 w-[420px] rounded-[18px] border border-[var(--box-border)] bg-[rgba(255,255,255,0.98)] px-5 py-5 text-sm text-[var(--foreground)] shadow-[var(--box-shadow)] ${isCollapsed ? 'bottom-2 left-[72px]' : 'bottom-[88px] left-4'}`}
           >
             <div className="flex items-center gap-3">
               <AvatarBadge value={profileAvatarDraft} size="lg" />
@@ -372,17 +436,11 @@ function SidebarInner({ pathname }: { pathname: string }) {
               </div>
             </div>
 
-            <div className="mt-4 space-y-3 rounded-[14px] border border-[var(--box-border)] bg-[rgba(255,255,255,0.72)] px-3 py-3">
-              <div className="flex items-center gap-3">
-                <AvatarBadge value={profileAvatarDraft} size="md" />
-                <input
-                  value={isImageAvatar(profileAvatarDraft) ? '' : profileAvatarDraft}
-                  onChange={(event) => setProfileAvatarDraft(normalizeAvatarInput(event.target.value) || '梨')}
-                  className="koc-input-font h-10 min-w-0 flex-1 rounded-full border border-[var(--box-border)] bg-white px-4 text-[14px] text-[var(--foreground)] outline-none"
-                  placeholder="自定义头像"
-                />
-                <label className="koc-heading-font flex h-10 shrink-0 cursor-pointer items-center rounded-full border border-[var(--box-border)] bg-white px-3 text-[13px] text-[var(--foreground)] shadow-[var(--box-shadow)] transition hover:bg-[#fff3f5]">
-                  上传
+            <div className="mt-4 grid gap-4 rounded-[14px] border border-[var(--box-border)] bg-[rgba(255,255,255,0.72)] px-4 py-4 sm:grid-cols-[132px_1fr]">
+              <div className="flex flex-col items-center gap-3">
+                <AvatarBadge value={profileAvatarDraft} size="lg" />
+                <label className="koc-heading-font flex h-10 w-full shrink-0 cursor-pointer items-center justify-center rounded-[12px] border border-[var(--box-border)] bg-white px-3 text-[13px] text-[var(--foreground)] shadow-[var(--box-shadow)] transition hover:bg-[var(--nav-hover)]">
+                  上传头像
                   <input
                     type="file"
                     accept="image/*"
@@ -391,29 +449,60 @@ function SidebarInner({ pathname }: { pathname: string }) {
                   />
                 </label>
               </div>
-              <input
-                value={profileNameDraft}
-                onChange={(event) => setProfileNameDraft(event.target.value.slice(0, 16))}
-                className="koc-input-font h-10 w-full rounded-full border border-[var(--box-border)] bg-white px-4 text-[14px] text-[var(--foreground)] outline-none"
-                placeholder="设置昵称"
-              />
-              <div className="grid grid-cols-6 gap-2">
-                {AVATAR_OPTIONS.map((option) => (
+              <div className="min-w-0 space-y-3">
+                <input
+                  value={profileNameDraft}
+                  onChange={(event) => setProfileNameDraft(event.target.value.slice(0, 16))}
+                  className="koc-input-font h-10 w-full rounded-full border border-[var(--box-border)] bg-white px-4 text-[14px] text-[var(--foreground)] outline-none"
+                  placeholder="设置昵称"
+                />
+              {profileAvatarSource && (
+                <div className="space-y-3">
+                  <label className="block text-[13px] leading-5 text-[var(--foreground)]">
+                    <span className="mb-1 block">缩放</span>
+                    <input
+                      type="range"
+                      min="0.75"
+                      max="2.4"
+                      step="0.05"
+                      value={profileAvatarTransform.scale}
+                      onChange={(event) => void applyAvatarTransform({ ...profileAvatarTransform, scale: Number(event.target.value) })}
+                      className="koc-avatar-range"
+                    />
+                  </label>
+                  <label className="block text-[13px] leading-5 text-[var(--foreground)]">
+                    <span className="mb-1 block">左右</span>
+                    <input
+                      type="range"
+                      min="-80"
+                      max="80"
+                      step="1"
+                      value={profileAvatarTransform.x}
+                      onChange={(event) => void applyAvatarTransform({ ...profileAvatarTransform, x: Number(event.target.value) })}
+                      className="koc-avatar-range"
+                    />
+                  </label>
+                  <label className="block text-[13px] leading-5 text-[var(--foreground)]">
+                    <span className="mb-1 block">上下</span>
+                    <input
+                      type="range"
+                      min="-80"
+                      max="80"
+                      step="1"
+                      value={profileAvatarTransform.y}
+                      onChange={(event) => void applyAvatarTransform({ ...profileAvatarTransform, y: Number(event.target.value) })}
+                      className="koc-avatar-range"
+                    />
+                  </label>
                   <button
-                    key={option}
                     type="button"
-                    onClick={() => setProfileAvatarDraft(option)}
-                    className={`koc-heading-font flex size-8 items-center justify-center rounded-full border text-[14px] transition ${
-                      profileAvatarDraft === option
-                        ? 'border-[#DE868F] bg-[#DE868F] text-white'
-                        : 'border-[var(--box-border)] bg-white text-[var(--foreground)] hover:bg-[#fff3f5]'
-                    }`}
-                    aria-label={`选择头像 ${option}`}
+                    onClick={() => void applyAvatarTransform(DEFAULT_AVATAR_TRANSFORM)}
+                    className="rounded-[10px] border border-[var(--box-border)] bg-white px-3 py-1.5 text-[12px] text-[var(--foreground)] transition hover:bg-[var(--nav-hover)]"
                   >
-                    {option}
+                    重置头像
                   </button>
-                ))}
-              </div>
+                </div>
+              )}
               <button
                 type="button"
                 disabled={isProfileSaving || !profileNameDraft.trim()}
@@ -435,6 +524,7 @@ function SidebarInner({ pathname }: { pathname: string }) {
                 {isProfileSaving ? '保存中…' : '保存昵称和头像'}
               </button>
               {profileNotice && <p className="text-center text-[12px] text-[var(--foreground)]/70">{profileNotice}</p>}
+              </div>
             </div>
 
             <div className="mt-4">
@@ -569,7 +659,7 @@ function SidebarInner({ pathname }: { pathname: string }) {
             <AvatarBadge value={user?.avatar} size="lg" />
           ) : (
             <span className={`koc-icon-center shrink-0 ${isCollapsed ? 'size-[48px]' : 'size-[56px]'}`}>
-              <Image src="/koc-assets/icons/图标/登录.svg" alt="" width={56} height={56} className={isCollapsed ? 'size-[46px]' : 'size-[56px]'} />
+              <Image src="/koc-assets/icons/图标/登录.svg" alt="" width={56} height={56} className={isCollapsed ? 'size-[46px]' : 'size-[56px]'} style={sidebarIconStyle} />
             </span>
           )}
 
@@ -578,7 +668,7 @@ function SidebarInner({ pathname }: { pathname: string }) {
               <span className="koc-title-font block max-w-[130px] truncate text-[28px] leading-tight text-[var(--foreground)]">
                 {titleText}
               </span>
-              {!isAuthenticated && <span className="mt-1 block text-sm text-[var(--foreground)]/50">游客体验中</span>}
+              {!isAuthenticated && <span className="mt-1 block text-sm text-[var(--foreground)]/55">游客体验中</span>}
             </span>
           )}
         </button>

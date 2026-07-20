@@ -25,7 +25,7 @@ export default function AuthPanelShell({
 }) {
   return (
     <section
-      className={`koc-auth-ambient-background relative w-full ${maxWidthClassName} rounded-[34px] border border-[var(--box-border)] shadow-[var(--box-shadow)] ${bodyClassName}`.trim()}
+      className={`koc-auth-ambient-background relative w-full ${maxWidthClassName} rounded-[18px] border border-[var(--box-border)] shadow-[var(--box-shadow)] ${bodyClassName}`.trim()}
       role={role}
       aria-modal={ariaModal}
       aria-labelledby={ariaLabelledBy}

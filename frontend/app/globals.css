@@ -25,32 +25,40 @@
 }
 
 :root {
-  --background: #f5f5f5;
+  --background: #f8fbff;
   --ambient-background:
-    radial-gradient(ellipse 68vw 50vw at 12% 18%, rgba(197, 138, 228, 0.79) 0, rgba(197, 138, 228, 0.34) 34%, rgba(197, 138, 228, 0.12) 55%, rgba(197, 138, 228, 0) 72%),
-    radial-gradient(circle 26vw at 86% 14%, rgba(222, 177, 138, 0.27) 0, rgba(222, 177, 138, 0.16) 38%, rgba(222, 177, 138, 0.06) 60%, rgba(222, 177, 138, 0) 76%),
-    radial-gradient(circle 30vw at 100% 100%, rgba(153, 120, 205, 0.57) 0, rgba(153, 120, 205, 0.3) 36%, rgba(153, 120, 205, 0.1) 58%, rgba(153, 120, 205, 0) 74%);
+    radial-gradient(circle 42vw at 13% 16%, rgba(37, 99, 235, 0.12) 0, rgba(37, 99, 235, 0.055) 36%, rgba(37, 99, 235, 0) 68%),
+    radial-gradient(circle 38vw at 76% 12%, rgba(124, 58, 237, 0.1) 0, rgba(124, 58, 237, 0.045) 36%, rgba(124, 58, 237, 0) 68%),
+    radial-gradient(circle 42vw at 82% 58%, rgba(14, 165, 233, 0.08) 0, rgba(14, 165, 233, 0.035) 40%, rgba(14, 165, 233, 0) 72%),
+    linear-gradient(180deg, #ffffff 0%, #fbfdff 48%, #f6faff 100%);
   --ambient-background-compact:
-    radial-gradient(ellipse 94% 72% at 12% 18%, rgba(197, 138, 228, 0.79) 0, rgba(197, 138, 228, 0.34) 34%, rgba(197, 138, 228, 0.12) 55%, rgba(197, 138, 228, 0) 72%),
-    radial-gradient(ellipse 32% 32% at 86% 14%, rgba(222, 177, 138, 0.27) 0, rgba(222, 177, 138, 0.16) 38%, rgba(222, 177, 138, 0.06) 60%, rgba(222, 177, 138, 0) 76%),
-    radial-gradient(ellipse 38% 38% at 100% 100%, rgba(153, 120, 205, 0.57) 0, rgba(153, 120, 205, 0.3) 36%, rgba(153, 120, 205, 0.1) 58%, rgba(153, 120, 205, 0) 74%);
-  --foreground: #0b1838;
-  --app-shell: #f5f5f5;
-  --sidebar: rgba(255, 255, 255, 0.45);
-  --paper: rgba(255, 255, 255, 0.92);
-  --paper-strong: rgba(255, 255, 255, 0.96);
-  --panel: rgba(255, 255, 255, 0.88);
-  --box-border: #bbbbbb;
-  --box-shadow: 4px 6px 10px rgba(33, 84, 118, 0.24);
-  --cta-shadow: 0 2px 8px rgba(0, 0, 0, 0.22);
-  --chat-bubble-bg: rgba(245, 245, 245, 0.4);
-  --chat-bubble-border: #bbbbbb;
-  --chat-input-shadow: 2px 4px 7px rgba(33, 84, 118, 0.18);
-  --chat-bubble-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
-  --chat-action-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
-  --title-blue: #0b3598;
-  --accent-rose: #de868f;
-  --muted-text: #0b1838;
+    radial-gradient(circle 72% at 10% 18%, rgba(37, 99, 235, 0.1) 0, rgba(37, 99, 235, 0.045) 34%, rgba(37, 99, 235, 0) 66%),
+    radial-gradient(circle 64% at 78% 16%, rgba(124, 58, 237, 0.09) 0, rgba(124, 58, 237, 0.04) 36%, rgba(124, 58, 237, 0) 68%),
+    linear-gradient(180deg, #ffffff 0%, #fbfdff 50%, #f6faff 100%);
+  --foreground: #111827;
+  --app-shell: #f8fbff;
+  --sidebar: rgba(248, 251, 255, 0.92);
+  --main-surface: rgba(255, 255, 255, 0.94);
+  --paper: #ffffff;
+  --paper-strong: #ffffff;
+  --panel: #ffffff;
+  --box-border: #dfe7f2;
+  --box-shadow: 0 12px 30px rgba(37, 99, 235, 0.07);
+  --cta-shadow: 0 10px 22px rgba(37, 99, 235, 0.2);
+  --chat-bubble-bg: #ffffff;
+  --chat-bubble-border: #e5e7eb;
+  --chat-input-shadow: 0 8px 22px rgba(15, 23, 42, 0.08);
+  --chat-bubble-shadow: 0 8px 22px rgba(15, 23, 42, 0.06);
+  --chat-action-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
+  --title-blue: #111827;
+  --title-gradient: linear-gradient(90deg, #1769ff 0%, #6759f5 56%, #9557df 100%);
+  --primary: #2563eb;
+  --primary-hover: #1d4ed8;
+  --primary-icon-filter: brightness(0) saturate(100%);
+  --nav-active: #eaf3ff;
+  --nav-hover: #f3f8ff;
+  --accent-rose: #2563eb;
+  --muted-text: #6b7280;
   --font-koc-base: "PingFang SC", "Microsoft YaHei", "Hiragino Sans GB", sans-serif;
   --font-koc-title: "ZiHunXinQuHei", "PingFang SC", "Microsoft YaHei", sans-serif;
   --font-koc-heading: "HanYiDaHeiJian", "PingFang SC", "Microsoft YaHei", sans-serif;
@@ -106,7 +114,7 @@ select {
 
 input::placeholder,
 textarea::placeholder {
-  color: #888888 !important;
+  color: #8a94a6 !important;
   opacity: 1 !important;
 }
 
@@ -129,14 +137,14 @@ input[type="radio"] {
   width: 16px;
   height: 16px;
   border-radius: 999px;
-  border: 1px solid #de868f;
+  border: 1px solid var(--primary);
   background: #fff;
   box-shadow: inset 0 0 0 3px #fff;
   cursor: pointer;
 }
 
 input[type="radio"]:checked {
-  background: #de868f;
+  background: var(--primary);
 }
 
 .koc-app-shell {
@@ -201,6 +209,31 @@ input[type="radio"]:checked {
   font-family: var(--font-koc-title);
 }
 
+.koc-gradient-title {
+  font-family: var(--font-koc-title);
+  font-weight: 500;
+  letter-spacing: 0;
+  background-image: none;
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: var(--foreground);
+  -webkit-text-fill-color: currentColor;
+}
+
+.koc-sidebar-pressable:active {
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.16), var(--box-shadow);
+}
+
+.koc-sidebar-root a:active,
+.koc-sidebar-root button:active {
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.16), var(--box-shadow);
+}
+
+.koc-avatar-range {
+  width: 100%;
+  accent-color: var(--primary);
+}
+
 .koc-heading-font {
   font-family: var(--font-koc-heading);
 }
@@ -214,11 +247,11 @@ input[type="radio"]:checked {
 }
 
 input.koc-auth-input:not([type="checkbox"]):not([type="radio"]) {
-  border-radius: 999px;
+  border-radius: 12px;
 }
 
 input.koc-profile-input:not([type="checkbox"]):not([type="radio"]) {
-  border-radius: 999px;
+  border-radius: 12px;
   font-size: 17px;
   line-height: 56px;
 }
@@ -244,8 +277,13 @@ input.koc-profile-input:not([type="checkbox"]):not([type="radio"]) {
 
 .koc-primary-back-button {
   border: 1px solid var(--box-border);
-  background: rgba(255, 255, 255, 0.3);
+  background: #ffffff;
   box-shadow: var(--box-shadow);
+}
+
+img[src*="/koc-assets/icons/"],
+img[src*="koc-assets%2Ficons"] {
+  filter: var(--primary-icon-filter);
 }
 
 .koc-ambient-background {
@@ -287,6 +325,75 @@ input.koc-profile-input:not([type="checkbox"]):not([type="radio"]) {
   height: 30px;
   color: var(--accent-rose);
   flex: 0 0 auto;
+}
+
+.bg-\[\#DE868F\] {
+  background-color: var(--primary) !important;
+}
+
+.hover\:bg-\[\#fff3f5\]:hover {
+  background-color: var(--nav-hover) !important;
+}
+
+.bg-\[\#fff3f5\],
+.bg-\[rgba\(239\,229\,217\,0\.8\)\] {
+  background-color: #f6f7f9 !important;
+}
+
+.bg-\[rgba\(255\,255\,255\,0\.43\)\] {
+  background-color: var(--nav-active) !important;
+}
+
+.bg-\[rgba\(255\,255\,255\,0\.62\)\] {
+  background-color: var(--nav-hover) !important;
+}
+
+.bg-\[rgba\(245\,245\,245\,0\.45\)\],
+.bg-\[rgba\(245\,245\,245\,0\.52\)\],
+.bg-\[rgba\(245\,245\,245\,0\.6\)\],
+.bg-\[rgba\(245\,245\,245\,0\.8\)\] {
+  background-color: #ffffff !important;
+}
+
+.bg-\[rgba\(255\,255\,255\,0\.3\)\],
+.bg-\[rgba\(255\,255\,255\,0\.72\)\],
+.bg-\[rgba\(255\,255\,255\,0\.74\)\],
+.bg-\[rgba\(255\,255\,255\,0\.78\)\],
+.bg-\[rgba\(255\,255\,255\,0\.82\)\],
+.bg-\[rgba\(255\,255\,255\,0\.88\)\],
+.bg-\[rgba\(255\,255\,255\,0\.9\)\],
+.bg-\[rgba\(255\,255\,255\,0\.92\)\],
+.bg-\[rgba\(255\,255\,255\,0\.94\)\],
+.bg-\[rgba\(255\,255\,255\,0\.95\)\],
+.bg-\[rgba\(255\,255\,255\,0\.96\)\],
+.bg-\[rgba\(255\,255\,255\,0\.98\)\] {
+  background-color: #ffffff !important;
+}
+
+.border-\[\#888888\],
+.border-\[\#FFFFFF\],
+.border-\[\#DE868F\],
+.border-\[\#DE868F\]\/45 {
+  border-color: var(--box-border) !important;
+}
+
+.text-\[\#DE868F\],
+.hover\:text-\[\#DE868F\]:hover,
+.text-\[\#6f5140\] {
+  color: var(--primary) !important;
+}
+
+.accent-\[\#DE868F\] {
+  accent-color: var(--primary) !important;
+}
+
+.rounded-\[34px\],
+.rounded-\[26px\],
+.rounded-\[24px\],
+.rounded-\[22px\],
+.rounded-\[20px\],
+.rounded-\[18px\] {
+  border-radius: 16px !important;
 }
 
 .koc-top-icon-square {

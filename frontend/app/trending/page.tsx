@@ -1310,7 +1310,7 @@ export default function TrendingPage() {
         {viewMode === 'history' ? (
         <section className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <div className="mx-auto mt-8 w-full max-w-[980px] shrink-0 text-center">
-            <h1 className="koc-title-font text-[30px] leading-tight text-[var(--title-blue)]">Hi，我是你的热点小猪梨</h1>
+            <h1 className="koc-title-font koc-gradient-title text-[30px] leading-tight">Hi，我是你的热点小猪梨</h1>
             <p className="koc-song-font mt-2 text-[22px] leading-tight text-[var(--foreground)]">
               我会结合你的内容方向，追踪近一周热点趋势和受众需求
             </p>

@@ -18,13 +18,13 @@ export default function ScenarioHeader({
       <div className="mb-5 flex flex-col gap-4 rounded-[24px] border border-transparent bg-transparent px-1 py-5 shadow-none sm:flex-row sm:items-center sm:justify-between">
         <div className="flex min-w-0 items-center gap-5">
           <div
-            className="koc-heading-font grid size-[72px] place-items-center rounded-full border border-[var(--box-border)] bg-[rgba(239,229,217,0.8)] text-[34px] text-[var(--foreground)] shadow-[var(--box-shadow)]"
+            className="koc-heading-font grid size-[64px] place-items-center rounded-[16px] border border-[var(--box-border)] bg-[#f6f7f9] text-[30px] text-[var(--foreground)] shadow-[var(--box-shadow)]"
           >
             梨
           </div>
           <div>
-            <h1 className="koc-title-font text-[34px] leading-tight text-[var(--foreground)]">{title}</h1>
-            <p className="koc-song-font mt-1 text-[17px] leading-6 text-[var(--foreground)]">{subtitle}</p>
+            <h1 className="koc-title-font koc-gradient-title text-[30px] leading-tight">{title}</h1>
+            <p className="koc-song-font mt-1 text-[16px] leading-6 text-[var(--muted-text)]">{subtitle}</p>
           </div>
         </div>
         {action}

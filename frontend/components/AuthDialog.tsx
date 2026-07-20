@@ -183,7 +183,7 @@ export default function AuthDialog() {
     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-[rgba(11,24,56,0.08)] px-5 py-8 backdrop-blur-[2px]">
       <AuthPanelShell
         title={authDialog.mode === 'login' ? '顶流养成计划 · 登录' : '顶流养成计划 · 注册'}
-        titleClassName="text-[34px]"
+        titleClassName="text-[28px]"
         ariaLabelledBy="auth-dialog-title"
       >
         <button
@@ -306,7 +306,7 @@ export default function AuthDialog() {
           <button
             type="submit"
             disabled={isSubmitting}
-            className="koc-heading-font inline-flex h-[64px] w-full items-center justify-center rounded-full border border-[#888888] bg-[#DE868F] px-7 text-[34px] text-white shadow-[var(--cta-shadow)] transition hover:opacity-92 disabled:cursor-not-allowed disabled:opacity-60"
+            className="koc-heading-font inline-flex h-[56px] w-full items-center justify-center rounded-[12px] border border-[var(--box-border)] bg-[var(--primary)] px-7 text-[24px] text-white shadow-[var(--cta-shadow)] transition hover:bg-[var(--primary-hover)] disabled:cursor-not-allowed disabled:opacity-60"
           >
             {isSubmitting ? '提交中…' : authDialog.mode === 'login' ? '登录' : '注册'}
           </button>

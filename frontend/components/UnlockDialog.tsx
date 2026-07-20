@@ -57,7 +57,7 @@ export default function UnlockDialog() {
         title={unlockDialog.title}
         maxWidthClassName="max-w-[850px]"
         bodyClassName="px-7 py-10 sm:px-12 sm:py-12"
-        titleClassName="text-[40px] sm:text-[56px]"
+        titleClassName="text-[30px] sm:text-[38px]"
         ariaLabelledBy="unlock-dialog-title"
       >
         <button
@@ -81,7 +81,7 @@ export default function UnlockDialog() {
           <button
             type="button"
             onClick={() => handleOpenAuth('login')}
-            className="koc-heading-font mt-10 inline-flex h-[72px] w-full max-w-[500px] items-center justify-center rounded-full border border-[#888888] bg-[#DE868F] px-8 text-[28px] text-white shadow-[var(--cta-shadow)] transition hover:opacity-92"
+            className="koc-heading-font mt-10 inline-flex h-[56px] w-full max-w-[420px] items-center justify-center rounded-[12px] border border-[var(--box-border)] bg-[var(--primary)] px-8 text-[22px] text-white shadow-[var(--cta-shadow)] transition hover:bg-[var(--primary-hover)]"
           >
             登录
           </button>

@@ -1523,7 +1523,7 @@ export default function ProfilePage() {
         <section className="mx-auto min-h-0 flex-1 w-full max-w-[920px] overflow-y-auto pr-1 sm:pr-2">
           <div className="flex min-h-full w-full flex-col items-center justify-center py-2">
             <div className="mb-6 text-center">
-              <h1 className="koc-title-font text-[36px] leading-tight text-[var(--title-blue)]">Hi，我是你的人设小猪梨</h1>
+              <h1 className="koc-title-font koc-gradient-title text-[36px] leading-tight">Hi，我是你的人设小猪梨</h1>
               <p className="koc-heading-font mt-2 text-[26px] leading-tight text-[var(--foreground)]">现在请填写以下内容以完成人设分析：</p>
             </div>
 
@@ -1555,7 +1555,7 @@ export default function ProfilePage() {
                           name="gender"
                           checked={info.gender === gender}
                           onChange={() => updateInfo('gender', gender)}
-                          className="size-[14px] border border-[#DE868F] bg-[#DE868F] accent-[#DE868F]"
+                          className="size-[14px] border border-[var(--primary)]"
                         />
                         <span>{gender}</span>
                       </label>

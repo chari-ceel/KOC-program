@@ -115,7 +115,7 @@ export default function PersonaFavoritesPage() {
       <TopToast message={notice} tone={noticeTone} />
       <section className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <div className="mx-auto mt-8 w-full max-w-[980px] shrink-0 text-center">
-          <h1 className="koc-title-font text-[30px] leading-tight text-[var(--title-blue)]">人设收藏</h1>
+          <h1 className="koc-title-font koc-gradient-title text-[30px] leading-tight">人设收藏</h1>
           <p className="koc-song-font mt-2 text-[22px] leading-tight text-[var(--foreground)]">
             收藏人设会长期保存，普通保存历史只保留 7 天
           </p>

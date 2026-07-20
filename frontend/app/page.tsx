@@ -622,13 +622,13 @@ function HomeContent() {
           ) : showDialogLandingLayout ? (
             <section className="relative flex min-h-full flex-1 flex-col">
               <div className="absolute left-1/2 top-[44%] w-full max-w-[1100px] -translate-x-1/2 -translate-y-1/2 text-center">
-                <h1 className="koc-title-font whitespace-pre-line text-[78px] leading-[0.94] text-[var(--title-blue)]">
+                <h1 className="koc-title-font koc-gradient-title whitespace-pre-line text-[34px] leading-[1.08] sm:text-[64px] sm:leading-[0.98] lg:text-[78px] lg:leading-[0.94]">
                   {introCopy.title}
                 </h1>
               </div>
 
               <div className="absolute bottom-[6vh] left-1/2 w-full max-w-[980px] -translate-x-1/2">
-                <div className="koc-song-font mb-7 space-y-3 text-center text-[29px] leading-[1.5] text-[var(--foreground)]">
+                <div className="koc-song-font mb-7 space-y-3 text-center text-[18px] leading-[1.5] text-[var(--foreground)] sm:text-[24px] lg:text-[29px]">
                   {introCopy.lines.map((line) => (
                     <p key={line}>{line}</p>
                   ))}
@@ -680,17 +680,17 @@ function HomeContent() {
                 }`}
               >
                 <h1
-                  className={`koc-title-font ${
-                    showCenteredHomeLayout ? 'absolute left-1/2 top-[44%] w-full max-w-[1100px] -translate-x-1/2 -translate-y-1/2 whitespace-pre-line text-[78px] leading-[0.96]' : 'whitespace-pre-line text-[38px]'
-                  } text-center text-[var(--title-blue)]`}
+                  className={`koc-title-font koc-gradient-title ${
+                    showCenteredHomeLayout ? 'absolute left-1/2 top-[44%] w-full max-w-[1100px] -translate-x-1/2 -translate-y-1/2 whitespace-pre-line text-[34px] leading-[1.08] sm:text-[64px] sm:leading-[1] lg:text-[78px] lg:leading-[0.96]' : 'whitespace-pre-line text-[34px] leading-[1.08] sm:text-[38px]'
+                  } text-center`}
                 >
                   {`${introCopy.title}\n我是你的小猪梨`}
                 </h1>
                 <div
                   className={`${
                     showCenteredHomeLayout
-                        ? 'koc-song-font absolute bottom-[7vh] left-1/2 w-full max-w-[1100px] -translate-x-1/2 text-center text-[26px] leading-[1.55]'
-                        : 'koc-song-font mt-auto text-center text-[28px] leading-[1.55]'
+                        ? 'koc-song-font absolute bottom-[7vh] left-1/2 w-full max-w-[1100px] -translate-x-1/2 text-center text-[18px] leading-[1.45] sm:text-[22px] sm:leading-[1.5] lg:text-[26px] lg:leading-[1.55]'
+                        : 'koc-song-font mt-auto text-center text-[18px] leading-[1.45] sm:text-[28px] sm:leading-[1.55]'
                   } space-y-3 text-[var(--foreground)]`}
                 >
                   {introCopy.lines.map((line) => (

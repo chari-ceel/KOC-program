@@ -17,7 +17,7 @@ export default function LoginButton({ className = '' }: { className?: string }) 
           redirectTo: next,
         });
       }}
-      className={`koc-heading-font rounded-[20px] border border-[var(--box-border)] bg-[rgba(255,255,255,0.3)] px-9 py-4 text-[34px] text-[#6f5140] shadow-[var(--box-shadow)] transition hover:bg-[rgba(255,255,255,0.42)] ${className}`}
+      className={`koc-heading-font rounded-[14px] border border-[var(--box-border)] bg-white px-7 py-3 text-[20px] text-[var(--primary)] shadow-[var(--box-shadow)] transition hover:bg-[var(--nav-hover)] ${className}`}
     >
       登录
     </button>
