@@ -115,3 +115,61 @@ def test_agent_chat_conversations_route_uses_logged_in_user(monkeypatch):
     assert response.status_code == 200
     assert response.json()["conversations"][0]["title"] == "平价美妆测评"
     assert captured == {"user_id": "session-user", "limit": 20}
+
+
+def test_agent_chat_conversation_detail_route_returns_history(monkeypatch):
+    captured = {}
+
+    def fake_get_conversation(**kwargs):
+        captured.update(kwargs)
+        return {
+            "conversation_id": kwargs["conversation_id"],
+            "conversation_title": "平价美妆测评",
+            "current_step": "done",
+            "messages": [
+                {
+                    "id": "msg_001",
+                    "role": "assistant",
+                    "content": "推荐标题：新手通勤妆5分钟出门",
+                    "step": "content",
+                    "created_at": "2026-07-20T10:30:00+08:00",
+                }
+            ],
+            "summary": {
+                "content": {
+                    "done": True,
+                    "title": "内容撰写",
+                    "text": "新手通勤妆5分钟出门",
+                    "message_id": "msg_001",
+                    "memory_id": "content_001",
+                    "items": [
+                        {
+                            "memory_id": "content_001",
+                            "title": "新手通勤妆5分钟出门",
+                            "text": "新手通勤妆5分钟出门",
+                            "message_id": "msg_001",
+                            "active": True,
+                            "created_at": "2026-07-20T10:30:00+08:00",
+                        }
+                    ],
+                }
+            },
+            "memory_refs": {"content_memory_id": "content_001"},
+        }
+
+    app.dependency_overrides[get_current_user] = lambda: AuthenticatedUser(user_id="session-user", username="tester")
+    monkeypatch.setattr(agent_chat_endpoint.service, "get_conversation", fake_get_conversation)
+
+    response = client.get("/api/agent/conversations/conv_001")
+
+    assert response.status_code == 200
+    assert response.json()["summary"]["content"]["items"][0]["message_id"] == "msg_001"
+    assert captured == {"user_id": "session-user", "conversation_id": "conv_001"}
+
+
+def test_agent_chat_conversation_detail_route_returns_404(monkeypatch):
+    monkeypatch.setattr(agent_chat_endpoint.service, "get_conversation", lambda **kwargs: None)
+
+    response = client.get("/api/agent/conversations/missing")
+
+    assert response.status_code == 404

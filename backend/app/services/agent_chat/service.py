@@ -183,6 +183,30 @@ class UnifiedAgentChatService:
             )
         return {"conversations": conversations}
 
+    def get_conversation(self, *, user_id: str, conversation_id: str) -> Optional[Dict[str, Any]]:
+        conversation = self.memory_crud.get_agent_chat_conversation(user_id, conversation_id)
+        if not conversation:
+            return None
+        return {
+            "conversation_id": conversation_id,
+            "conversation_title": conversation.get("title") or conversation.get("persona_summary") or "新的创作对话",
+            "current_step": conversation.get("current_step") or "persona",
+            "messages": [
+                {
+                    "id": message["message_id"],
+                    "role": message["role"],
+                    "content": message["content"],
+                    "step": message.get("step"),
+                    "created_at": self._iso(message.get("created_at")),
+                }
+                for message in self.memory_crud.list_agent_chat_messages(user_id, conversation_id)
+                if message.get("message_id") and message.get("role") in {"user", "assistant"}
+            ],
+            "summary": self._build_summary(user_id, conversation_id, conversation),
+            "memory_refs": self._build_memory_refs(conversation_id, conversation),
+            "updated_at": self._iso(conversation.get("updated_at")),
+        }
+
     def _load_or_create_conversation(self, user_id: str, conversation_id: str) -> Dict[str, Any]:
         existing = self.memory_crud.get_agent_chat_conversation(user_id, conversation_id)
         if existing:
@@ -405,14 +429,15 @@ class UnifiedAgentChatService:
             return self._failed_step("我们先做一版热门追踪或选题，再进入内容撰写。", None)
 
         current_content = self._payload(module_memories.get("content"))
+        is_revision = self._is_revision_message(message) and not self._is_new_content_message(message)
         topic = self._choose_topic(trending, message, selected_topic_id)
         result = await self.content_service.draft(
             user_id,
             topic,
             message,
             conversation_history=conversation_history,
-            current_draft=current_content if current_content and self._is_revision_message(message) else None,
-            revision_instruction=message if current_content and self._is_revision_message(message) else None,
+            current_draft=current_content if current_content and is_revision else None,
+            revision_instruction=message if current_content and is_revision else None,
             writing_entry_source={
                 "sourceType": "unified_agent_chat",
                 "conversationId": conversation_id,
@@ -482,7 +507,40 @@ class UnifiedAgentChatService:
                 "message_id": memory.get("source_message_id") if memory else None,
                 "memory_id": memory.get("memory_id") if memory else None,
             }
+            if module == "content":
+                summary[module]["items"] = self._content_summary_items(user_id, conversation_id, conversation)
         return summary
+
+    def _content_summary_items(
+        self,
+        user_id: str,
+        conversation_id: str,
+        conversation: Dict[str, Any],
+    ) -> list[Dict[str, Any]]:
+        active_memory_id = conversation.get("active_content_memory_id")
+        active_persona_id = conversation.get("active_persona_memory_id")
+        active_trending_id = conversation.get("active_trending_memory_id")
+        memories = self.memory_crud.list_agent_module_memories(user_id, conversation_id, "content")
+        items = []
+        for memory in memories:
+            parent_refs = memory.get("parent_refs") if isinstance(memory.get("parent_refs"), dict) else {}
+            if active_persona_id and parent_refs.get("persona_memory_id") != active_persona_id:
+                continue
+            if active_trending_id and parent_refs.get("trending_memory_id") != active_trending_id:
+                continue
+            payload = memory.get("payload") if isinstance(memory.get("payload"), dict) else {}
+            item_title = payload.get("title") or memory.get("summary_text") or "内容草稿"
+            items.append(
+                {
+                    "memory_id": memory.get("memory_id"),
+                    "title": self._compact(str(item_title), 32),
+                    "text": memory.get("summary_text", ""),
+                    "message_id": memory.get("source_message_id"),
+                    "active": memory.get("memory_id") == active_memory_id,
+                    "created_at": self._iso(memory.get("created_at")),
+                }
+            )
+        return items
 
     def _build_memory_refs(self, conversation_id: str, conversation: Dict[str, Any]) -> Dict[str, Optional[str]]:
         return {
@@ -593,6 +651,24 @@ class UnifiedAgentChatService:
         text = re.sub(r"\s+", "", message)
         return self._matches(text, ("改", "重写", "优化", "润色", "换标题", "改标题", "改正文", "改开头"))
 
+    def _is_new_content_message(self, message: str) -> bool:
+        text = re.sub(r"\s+", "", message)
+        return self._matches(
+            text,
+            (
+                "再写一篇",
+                "新写一篇",
+                "换个内容",
+                "换一个内容",
+                "换一个方向",
+                "另一个角度",
+                "再来一版",
+                "重新写一篇",
+                "不要这篇写新的",
+                "不要这篇，写新的",
+            ),
+        )
+
     def _compact(self, text: str, limit: int) -> str:
         cleaned = re.sub(r"\s+", " ", text or "").strip(" ，,。")
         return cleaned if len(cleaned) <= limit else cleaned[: limit - 1].rstrip(" ，,。") + "…"
@@ -628,7 +704,7 @@ class UnifiedAgentChatService:
         }
 
     def _empty_summary(self) -> Dict[str, Dict[str, Any]]:
-        return {
+        summary = {
             module: {
                 "done": False,
                 "title": title,
@@ -638,6 +714,8 @@ class UnifiedAgentChatService:
             }
             for module, title in SUMMARY_TITLES.items()
         }
+        summary["content"]["items"] = []
+        return summary
 
     def _iso(self, value: Any) -> str:
         if isinstance(value, datetime):
