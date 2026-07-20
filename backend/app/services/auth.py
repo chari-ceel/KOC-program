@@ -121,6 +121,9 @@ class AuthService:
         trend_db.trend_snapshots.delete_many({"user_id": user_id})
         content_db.content_drafts.delete_many({"user_id": user_id})
         memory_db.conversation_memory.delete_many({"user_id": user_id})
+        memory_db.agent_chat_conversations.delete_many({"user_id": user_id})
+        memory_db.agent_chat_messages.delete_many({"user_id": user_id})
+        memory_db.agent_module_memories.delete_many({"user_id": user_id})
         return result.deleted_count > 0
 
     def get_user_by_session(self, session_id: str | None) -> Optional[AuthenticatedUser]:
