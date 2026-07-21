@@ -174,3 +174,15 @@ def test_format_content_text_normalizes_joined_punctuation() -> None:
         "结尾建议：如果你也经常想开始但总拖延\n\n"
         "标签建议：自律，大学生"
     )
+
+
+def test_format_content_text_strips_ai_template_wrappers() -> None:
+    service = ContentService()
+
+    text = service._format_content_text(
+        {
+            "reply": "以下是为你生成的一版小红书内容：\n\n早八赶时间也不用乱涂。\n\n希望对你有帮助。"
+        }
+    )
+
+    assert text == "早八赶时间也不用乱涂。"

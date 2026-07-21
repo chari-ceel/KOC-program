@@ -33,6 +33,16 @@ def teardown_function() -> None:
     app.dependency_overrides.clear()
 
 
+def test_debug_prompts_returns_human_voice_skill() -> None:
+    response = client.get("/api/debug/prompts")
+
+    assert response.status_code == 200
+    data = response.json()["data"]
+    assert data["prompts"]["content"]["appliedSkills"] == ["human_voice"]
+    assert "human_voice" in data["skills"]
+    assert "Human Voice Skill" in data["skills"]["human_voice"]["content"]
+
+
 def test_persona_analyze_route_returns_agent_data(monkeypatch) -> None:
     request_body = _read_json("persona_test.json")
     captured = {}

@@ -37,7 +37,7 @@ class MockRetrievalTool:
             for item in raw_items[: request.limit]
         ]
         return RetrievalToolResult(
-            source="mock_retrieval",
+            source=request.source,
             status="success" if items else "empty",
             items=items,
         )

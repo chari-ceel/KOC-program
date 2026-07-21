@@ -48,6 +48,7 @@ def test_unsupported_platform_returns_error() -> None:
 def test_general_chat_routes_to_workflow() -> None:
     payload = _request("general.chat")
     payload["input"] = {"userMessage": "你好"}
+    payload["options"] = {"runtimeProvider": "mock"}
     response = client.post("/agent/run", json=payload)
     body = response.json()
 
