@@ -792,10 +792,6 @@ function ContentPageInner() {
   }, []);
 
   const drafts = state.drafts;
-  const isSavedDraft = useCallback((draftId?: string) => Boolean(draftId && drafts.some((draft) => draft.id === draftId)), [drafts]);
-  const openImageGuide = useCallback((draftId: string) => {
-    router.push(`/image-guide?draftId=${encodeURIComponent(draftId)}`);
-  }, [router]);
 
   const switchViewMode = useCallback((nextViewMode: ViewMode) => {
     setViewMode(nextViewMode);
@@ -2101,14 +2097,6 @@ function ContentPageInner() {
                     >
                       删除
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => openImageGuide(draft.id)}
-                      className="absolute bottom-3 left-3 rounded-full border border-[var(--box-border)] bg-[rgba(255,255,255,0.94)] px-3 py-1.5 text-[13px] font-semibold text-[var(--foreground)] shadow-[var(--box-shadow)] transition hover:bg-[rgba(255,255,255,0.82)]"
-                      title="打开图文指导"
-                    >
-                      图文指导
-                    </button>
                   </div>
                 );
               })}
@@ -2180,15 +2168,6 @@ function ContentPageInner() {
                         refreshDisabled={isAgentLoading}
                         saving={isSaving}
                       />
-                      {message.draft && isSavedDraft(activeDraft?.id) && (
-                        <button
-                          type="button"
-                          onClick={() => activeDraft?.id && openImageGuide(activeDraft.id)}
-                          className="koc-heading-font rounded-full border border-[var(--box-border)] bg-[rgba(255,255,255,0.9)] px-4 py-2 text-[14px] text-[var(--foreground)] shadow-[var(--box-shadow)] transition hover:bg-white"
-                        >
-                          图文指导
-                        </button>
-                      )}
                     </div>
                   </div>
                 )}

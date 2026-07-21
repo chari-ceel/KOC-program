@@ -1,436 +1,397 @@
 'use client';
 
-import { Suspense, useCallback, useMemo, useState, useRef, useEffect, type FormEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import Image from 'next/image';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { API_BASE, extractTextFromResponse } from '@/lib/api';
-import LoginButton from '@/components/LoginButton';
-import MarkdownText from '@/components/MarkdownText';
-import ScenarioHeader from '@/components/ScenarioHeader';
+import { API_BASE } from '@/lib/api';
+import {
+  AGENT_CHAT_ENDPOINT,
+  type AgentChatResponse,
+  type AgentContentDraftPoint,
+  type AgentFlowSummary,
+  type AgentFlowSummaryItem,
+  type AgentLocalConversation,
+  type AgentMessage,
+  type AgentStep,
+} from '@/lib/agent-chat-contract';
+import {
+  AGENT_CHAT_CREATE_CONVERSATION_EVENT,
+  AGENT_CHAT_SELECT_CONVERSATION_EVENT,
+  SIDEBAR_COLLAPSE_EVENT,
+  createAndStoreConversation,
+  createWelcomeMessage,
+  defaultAgentSummary,
+  readActiveConversationId,
+  readLocalConversations,
+  upsertLocalConversation,
+} from '@/lib/agent-chat-store';
 import AgentStatusMessage from '@/components/AgentStatusMessage';
-import ScrollToBottomButton from '@/components/ScrollToBottomButton';
 import ChatInputShell from '@/components/ChatInputShell';
 import ChatMessageBubble from '@/components/ChatMessageBubble';
+import MarkdownText from '@/components/MarkdownText';
+import ScrollToBottomButton from '@/components/ScrollToBottomButton';
 import StopGenerationIcon from '@/components/StopGenerationIcon';
-import MessageActions from '@/components/MessageActions';
-import { useAuth, type AuthUser } from '@/context/AuthContext';
-import { readStoredAgentStatus, type AgentStatusState } from '@/lib/agent-status';
-import {
-  clearConversationId,
-  createClientEventId,
-  getOrCreateConversationId,
-  trackAnalyticsEvent,
-  type AgentOutputCopyEvent,
-} from '@/lib/analytics';
-import {
-  CONVERSATION_LIMIT_NOTICE,
-  hasReachedConversationHardStop,
-} from '@/lib/conversation-memory';
+import type { AgentStatusState } from '@/lib/agent-status';
 
-type ChatRole = 'user' | 'assistant';
-type HomeAuthStatus = 'loading' | 'authenticated' | 'anonymous';
-const LEGACY_HOME_CHAT_STATE_STORAGE_KEY = 'koc-agent-home-chat-state';
-const LEGACY_HOME_CHAT_SCROLL_TOP_STORAGE_KEY = 'koc-agent-home-chat-scroll-top';
-const HOME_CHAT_STATE_STORAGE_KEY_PREFIX = 'koc-agent-home-chat-state';
-const HOME_CHAT_SCROLL_TOP_STORAGE_KEY_PREFIX = 'koc-agent-home-chat-scroll-top';
-const HOME_CHAT_GUEST_STORAGE_OWNER = 'guest';
-const HOME_CHAT_STATE_UPDATED_EVENT = 'koc-home-chat-state-updated';
+type FlowSummaryKey = keyof AgentFlowSummary;
 
-interface ChatMessage {
-  id: number;
-  role: ChatRole;
-  content: string;
-}
+const stepOrder: Array<{ key: FlowSummaryKey; step: AgentStep; title: string; hint: string }> = [
+  { key: 'persona', step: 'persona', title: '人设打造', hint: '先确定账号定位、目标人群和内容语气。' },
+  { key: 'trending', step: 'trending', title: '热门追踪', hint: '围绕当前人设找可追的选题方向。' },
+  { key: 'content', step: 'content', title: '内容撰写', hint: '把选题落成标题、正文和发布文案。' },
+];
 
-interface StoredHomeChatState {
-  chatHistory: ChatMessage[];
-  loading: boolean;
-  agentStatus?: AgentStatusState | null;
-  activeRequestId?: string;
-}
-
-interface HomeChatStorageKeys {
-  state: string;
-  scrollTop: string;
-}
-
-const DIALOG_CONVERSATION_ID_STORAGE_KEY = 'koc-analytics-dialog-conversation-id';
-let homeChatRuntime: { requestId: string; controller: AbortController } | null = null;
-const cancelledHomeChatRequestIds = new Set<string>();
-
-function buildDialogCopyEvent(message: ChatMessage, index: number): AgentOutputCopyEvent {
+function createUserMessage(content: string): AgentMessage {
   return {
-    eventName: 'agent_output_copy',
-    module: 'dialog',
-    conversationId: getOrCreateConversationId(DIALOG_CONVERSATION_ID_STORAGE_KEY),
-    messageId: `dialog-message-${message.id}`,
-    messageIndex: index,
-    messageRole: 'assistant',
-    contentLength: message.content.length,
-    copySource: 'message_action_button',
+    id: `user_${Date.now()}`,
+    role: 'user',
+    content,
+    created_at: new Date().toISOString(),
   };
 }
 
-function getHomeChatStorageOwner(status: HomeAuthStatus, user: AuthUser | null) {
-  if (status === 'loading') return null;
-  if (status !== 'authenticated') return HOME_CHAT_GUEST_STORAGE_OWNER;
-
-  const userIdentifier = user?.id || user?.email || user?.name;
-  return userIdentifier ? `user:${userIdentifier}` : HOME_CHAT_GUEST_STORAGE_OWNER;
-}
-
-function buildHomeChatStorageKeys(owner: string): HomeChatStorageKeys {
-  const encodedOwner = encodeURIComponent(owner);
+function createAssistantMessage(content: string): AgentMessage {
   return {
-    state: `${HOME_CHAT_STATE_STORAGE_KEY_PREFIX}:${encodedOwner}`,
-    scrollTop: `${HOME_CHAT_SCROLL_TOP_STORAGE_KEY_PREFIX}:${encodedOwner}`,
+    id: `assistant_${Date.now()}`,
+    role: 'assistant',
+    content,
+    created_at: new Date().toISOString(),
   };
 }
 
-function clearLegacyHomeChatStorageKeys() {
-  if (typeof window === 'undefined') return;
-  window.localStorage.removeItem(LEGACY_HOME_CHAT_STATE_STORAGE_KEY);
-  window.localStorage.removeItem(LEGACY_HOME_CHAT_SCROLL_TOP_STORAGE_KEY);
+function compactText(text: string, maxLength = 30) {
+  const normalized = text.trim().replace(/\s+/g, ' ');
+  if (!normalized) return '';
+  const firstSentence = normalized.split(/[。；;.!！?？]/)[0] || normalized;
+  return firstSentence.length > maxLength ? `${firstSentence.slice(0, maxLength)}...` : firstSentence;
 }
 
-function readStoredHomeChatState(storageKeys: HomeChatStorageKeys): StoredHomeChatState | null {
-  if (typeof window === 'undefined') return null;
-  try {
-    const raw = window.localStorage.getItem(storageKeys.state);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as Partial<StoredHomeChatState>;
-    if (!Array.isArray(parsed.chatHistory)) return null;
-
-    const chatHistory = parsed.chatHistory.filter(
-      (message): message is ChatMessage =>
-        typeof message?.id === 'number' &&
-        (message.role === 'user' || message.role === 'assistant') &&
-        typeof message.content === 'string',
-    );
-    if (chatHistory.length === 0) return null;
-    const activeRequestId = typeof parsed.activeRequestId === 'string' ? parsed.activeRequestId : '';
-    const isActiveRuntime = Boolean(
-      parsed.loading &&
-        activeRequestId &&
-        homeChatRuntime &&
-        homeChatRuntime.requestId === activeRequestId,
-    );
-
-    return {
-      chatHistory,
-      loading: isActiveRuntime,
-      agentStatus: parsed.loading && !isActiveRuntime
-        ? { kind: 'stopped', message: '上次输出已中断。' }
-        : readStoredAgentStatus(parsed.agentStatus),
-      activeRequestId: isActiveRuntime ? activeRequestId : '',
-    };
-  } catch {
-    return null;
-  }
+function extractContentTitle(text: string) {
+  const normalized = text.trim();
+  const explicitTitle = normalized.match(/(?:标题|题目|笔记标题)\s*[:：]\s*([^\n]+)/);
+  const markdownTitle = normalized.match(/^#{1,3}\s+(.+)$/m);
+  const bracketTitle = normalized.match(/《([^》]+)》/);
+  return compactText(explicitTitle?.[1] || markdownTitle?.[1] || bracketTitle?.[1] || normalized, 34);
 }
 
-function writeStoredHomeChatState(storageKeys: HomeChatStorageKeys, state: StoredHomeChatState, notify = false) {
-  if (typeof window === 'undefined') return;
-  window.localStorage.setItem(storageKeys.state, JSON.stringify(state));
-  if (notify) {
-    window.dispatchEvent(new Event(HOME_CHAT_STATE_UPDATED_EVENT));
-  }
+function buildConversationTitle(summary: AgentFlowSummary, fallback: string) {
+  return compactText(summary.persona.text, 14) || fallback;
 }
 
-function clearStoredHomeChatState(storageKeys: HomeChatStorageKeys, notify = false) {
-  if (typeof window === 'undefined') return;
-  window.localStorage.removeItem(storageKeys.state);
-  window.localStorage.removeItem(storageKeys.scrollTop);
-  if (notify) {
-    window.dispatchEvent(new Event(HOME_CHAT_STATE_UPDATED_EVENT));
-  }
+function getCurrentStepTitle(step: AgentStep) {
+  if (step === 'done') return '流程已完成';
+  return stepOrder.find((item) => item.step === step)?.title ?? '人设打造';
 }
 
-function HomeContent() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
+function getNextPrompt(step: AgentStep) {
+  if (step === 'persona') return '告诉我你想做的账号方向。';
+  if (step === 'trending') return '说说你想追的赛道或选题。';
+  if (step === 'content') return '发来你想写的主题。';
+  return '可以继续微调内容。';
+}
+
+function isApprovalText(message: string) {
+  return /^(满意|可以|行|好|确认|下一步|继续|进入热门|进入内容|开始写内容|完成)$/i.test(message.trim());
+}
+
+function isRefineText(message: string) {
+  return /不满意|不行|改一下|再改|继续优化|再完善|不够|换个说法|重新生成/.test(message);
+}
+
+function isNewPersonaIntent(message: string) {
+  return /新(人设|角色|账号)|重新(做人设|做人设打造|开始)|换(一个)?(人设|角色|账号)|另(一个|外一个)(人设|角色|账号)/.test(message);
+}
+
+function detectTopicTag(text: string) {
+  if (/美妆|护肤|彩妆|口红|粉底/.test(text)) return 'beauty';
+  if (/穿搭|服饰|搭配|衣服|鞋/.test(text)) return 'fashion';
+  if (/职场|简历|面试|办公|副业/.test(text)) return 'career';
+  if (/学习|考研|英语|考试|备考/.test(text)) return 'study';
+  if (/旅行|探店|城市|酒店/.test(text)) return 'travel';
+  if (/育儿|亲子|母婴/.test(text)) return 'parenting';
+  if (/健身|减脂|运动|瑜伽/.test(text)) return 'fitness';
+  return '';
+}
+
+function isOffTopicForCurrentPersona(message: string, personaText: string) {
+  if (!personaText.trim()) return false;
+  if (isNewPersonaIntent(message)) return true;
+  if (!/(我想做|想改做|换成|改成|转做|开始做|要做)/.test(message)) return false;
+  const personaTag = detectTopicTag(personaText);
+  const messageTag = detectTopicTag(message);
+  return Boolean(personaTag && messageTag && personaTag !== messageTag);
+}
+
+function nextStepAfterApproval(step: AgentStep): AgentStep {
+  if (step === 'persona') return 'trending';
+  if (step === 'trending') return 'content';
+  if (step === 'content') return 'done';
+  return step;
+}
+
+function approvalMessage(step: AgentStep) {
+  if (step === 'persona') return '好，当前人设已确认。接下来我们做热门追踪。';
+  if (step === 'trending') return '好，选题方向已确认。接下来进入内容撰写。';
+  if (step === 'content') return '好，这版内容已确认。你可以复制文案去发布。';
+  return '已确认。';
+}
+
+function approvalButtonLabel(step: AgentStep) {
+  if (step === 'persona') return '满意，进入热门追踪';
+  if (step === 'trending') return '满意，进入内容撰写';
+  if (step === 'content') return '满意，完成';
+  return '满意';
+}
+
+function FlowStepIcon({ done }: { done: boolean }) {
+  return done ? (
+    <span className="mt-0.5 grid size-6 shrink-0 place-items-center rounded-full border border-[#22c55e] bg-[#dcfce7] text-[14px] font-bold text-[#16a34a]">
+      ✓
+    </span>
+  ) : (
+    <span className="mt-1 size-3 shrink-0 rounded-full border border-[#cbd5e1] bg-white" />
+  );
+}
+
+function FlowSummaryBlock({
+  item,
+  contentPoints,
+  fallbackTitle,
+  fallbackHint,
+  active,
+  onTrace,
+}: {
+  item: AgentFlowSummaryItem;
+  contentPoints?: AgentContentDraftPoint[];
+  fallbackTitle: string;
+  fallbackHint: string;
+  active: boolean;
+  onTrace: (messageId: string | null) => void;
+}) {
+  const summaryText = compactText(item.text, 72);
+  const hasContentPoints = Boolean(contentPoints?.length);
+  const canTraceStep = Boolean(item.message_id);
+  return (
+    <section className={`rounded-[16px] border px-4 py-4 ${active ? 'border-[#bfdbfe] bg-[#eff6ff]' : 'border-[var(--box-border)] bg-white'}`}>
+      <div className="flex items-start gap-3">
+        <FlowStepIcon done={item.done} />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center justify-between gap-2">
+            {canTraceStep ? (
+              <button
+                type="button"
+                onClick={() => onTrace(item.message_id)}
+                className="koc-heading-font text-left text-[16px] leading-tight text-[var(--foreground)] transition hover:text-[#2563eb]"
+              >
+                {item.title || fallbackTitle}
+              </button>
+            ) : (
+              <h3 className="koc-heading-font text-[16px] leading-tight text-[var(--foreground)]">{item.title || fallbackTitle}</h3>
+            )}
+            {active && <span className="rounded-full bg-[#dbeafe] px-2 py-0.5 text-[11px] text-[#1d4ed8]">当前</span>}
+          </div>
+          {hasContentPoints ? (
+            <div className="mt-2 space-y-1.5">
+              {contentPoints?.map((point, index) => (
+                <button
+                  key={point.id}
+                  type="button"
+                  onClick={() => onTrace(point.message_id)}
+                  className="block w-full truncate text-left text-[13px] leading-6 text-[var(--muted-text)] transition hover:text-[#2563eb]"
+                >
+                  {index + 1}. {point.title}
+                </button>
+              ))}
+            </div>
+          ) : summaryText ? (
+            <button type="button" onClick={() => onTrace(item.message_id)} className="mt-2 block w-full text-left text-[13px] leading-6 text-[var(--muted-text)] transition hover:text-[#2563eb]">
+              {summaryText}
+            </button>
+          ) : (
+            <p className="mt-2 text-[13px] leading-6 text-[var(--muted-text)]">{fallbackHint}</p>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+export default function Home() {
   const [input, setInput] = useState('');
-  const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
+  const [conversation, setConversation] = useState<AgentLocalConversation | null>(null);
   const [loading, setLoading] = useState(false);
   const [agentStatus, setAgentStatus] = useState<AgentStatusState | null>(null);
   const [showScrollDown, setShowScrollDown] = useState(false);
-  const [loadedHomeChatStorageOwner, setLoadedHomeChatStorageOwner] = useState<string | null>(null);
-  const conversationLimitToastShownRef = useRef(false);
-  const { status, user, isAuthenticated } = useAuth();
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
-  const pendingRestoreScrollRef = useRef(false);
-  const pendingAutoScrollRef = useRef(false);
-  const suppressNextAbortStatusRef = useRef(false);
-  const hasReachedConversationLimit = hasReachedConversationHardStop(chatHistory);
 
-  const isDialogPage = searchParams.get('view') === 'dialog';
-  const homeChatStorageOwner = useMemo(() => getHomeChatStorageOwner(status, user), [status, user]);
-  const homeChatStorageKeys = useMemo(
-    () => (homeChatStorageOwner ? buildHomeChatStorageKeys(homeChatStorageOwner) : null),
-    [homeChatStorageOwner],
-  );
+  const messages = conversation?.messages ?? [createWelcomeMessage()];
+  const summary = conversation?.summary ?? defaultAgentSummary;
+  const currentStep = conversation?.current_step ?? 'persona';
+  const currentRoleText = compactText(summary.persona.text);
+  const shouldShowSummary = messages.length > 1 || summary.persona.done || summary.trending.done || summary.content.done;
+  const currentStepKey = currentStep === 'persona' || currentStep === 'trending' || currentStep === 'content' ? currentStep : null;
+  const shouldShowApproval =
+    Boolean(conversation && currentStepKey && summary[currentStepKey].done && !conversation.phase_approval[currentStepKey] && !loading);
 
-  const introCopy = useMemo(() => {
-    if (!isDialogPage) {
-      return {
-        title: '欢迎来到顶流养成计划～',
-        lines: ['点击左边栏开启互联网之旅', '未使用过本猪梨的小宝请先点击人设打造'],
-      };
+  const persistConversation = useCallback((nextConversation: AgentLocalConversation) => {
+    const saved = upsertLocalConversation(nextConversation);
+    setConversation(saved);
+  }, []);
+
+  const loadConversation = useCallback((localId?: string) => {
+    const conversations = readLocalConversations();
+    const target = conversations.find((item) => item.local_id === localId) || conversations.find((item) => item.local_id === readActiveConversationId()) || conversations[0];
+    if (target) {
+      setConversation(target);
+      return;
     }
-    return {
-      title: '欢迎来到顶流养成计划～\n我是你的小猪梨',
-      lines: ['这里是临时对话框', '可用于临时资料查询，仅保留最近一次对话历史～'],
+    setConversation(createAndStoreConversation());
+  }, []);
+
+  useEffect(() => {
+    loadConversation();
+    const handleCreate = (event: Event) => loadConversation((event as CustomEvent<{ localId?: string }>).detail?.localId);
+    const handleSelect = (event: Event) => loadConversation((event as CustomEvent<{ localId?: string }>).detail?.localId);
+    window.addEventListener(AGENT_CHAT_CREATE_CONVERSATION_EVENT, handleCreate);
+    window.addEventListener(AGENT_CHAT_SELECT_CONVERSATION_EVENT, handleSelect);
+    return () => {
+      window.removeEventListener(AGENT_CHAT_CREATE_CONVERSATION_EVENT, handleCreate);
+      window.removeEventListener(AGENT_CHAT_SELECT_CONVERSATION_EVENT, handleSelect);
     };
-  }, [isDialogPage]);
+  }, [loadConversation]);
 
-  const showCenteredHomeLayout = !isDialogPage && chatHistory.length === 0;
-  const showDialogLandingLayout = isDialogPage && chatHistory.length === 0;
+  const scrollChatToBottom = useCallback(() => {
+    const container = chatContainerRef.current;
+    if (!container) return;
+    container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
+    setShowScrollDown(false);
+  }, []);
 
-  useEffect(() => {
-    if (isDialogPage) {
-      router.replace('/manual');
-    }
-  }, [isDialogPage, router]);
-
-  const applyStoredChatState = useCallback((restoreScroll = false) => {
-    if (!homeChatStorageKeys) return;
-    const storedChatState = readStoredHomeChatState(homeChatStorageKeys);
-    if (!storedChatState) return;
-    pendingRestoreScrollRef.current = restoreScroll;
-    setChatHistory(storedChatState.chatHistory);
-    setLoading(storedChatState.loading);
-    setAgentStatus(storedChatState.agentStatus ?? null);
-  }, [homeChatStorageKeys]);
+  const scrollToMessage = useCallback((messageId: string | null) => {
+    if (!messageId) return;
+    document.getElementById(`agent-message-${messageId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, []);
 
   useEffect(() => {
-    if (!isDialogPage || !homeChatStorageKeys || !homeChatStorageOwner) return;
-    if (homeChatRuntime?.requestId) {
-      cancelledHomeChatRequestIds.add(homeChatRuntime.requestId);
-    }
-    (homeChatRuntime?.controller || abortControllerRef.current)?.abort();
-    homeChatRuntime = null;
-    abortControllerRef.current = null;
-    pendingAutoScrollRef.current = false;
-    pendingRestoreScrollRef.current = false;
-    clearLegacyHomeChatStorageKeys();
-    const timer = window.setTimeout(() => {
-      setLoadedHomeChatStorageOwner(null);
-      setInput('');
-      setChatHistory([]);
-      setLoading(false);
-      setAgentStatus(null);
-      setShowScrollDown(false);
-      applyStoredChatState(true);
-      setLoadedHomeChatStorageOwner(homeChatStorageOwner);
-    }, 0);
-    return () => window.clearTimeout(timer);
-  }, [applyStoredChatState, homeChatStorageKeys, homeChatStorageOwner, isDialogPage]);
+    if (!loading) scrollChatToBottom();
+  }, [loading, messages.length, scrollChatToBottom]);
 
-  useEffect(() => {
-    if (!isDialogPage) return;
-    const handleUpdate = () => applyStoredChatState(false);
-    window.addEventListener(HOME_CHAT_STATE_UPDATED_EVENT, handleUpdate);
-    return () => window.removeEventListener(HOME_CHAT_STATE_UPDATED_EVENT, handleUpdate);
-  }, [applyStoredChatState, isDialogPage]);
-
-  useEffect(() => {
-    if (!isDialogPage || !homeChatStorageKeys || loadedHomeChatStorageOwner !== homeChatStorageOwner) return;
-    if (chatHistory.length === 0 && !loading && !agentStatus) return;
-    writeStoredHomeChatState(homeChatStorageKeys, {
-      chatHistory,
-      loading,
-      agentStatus,
-      activeRequestId: loading ? homeChatRuntime?.requestId || '' : '',
+  const approveCurrentStep = () => {
+    if (!conversation || !currentStepKey) return;
+    const nextStep = nextStepAfterApproval(currentStep);
+    persistConversation({
+      ...conversation,
+      current_step: nextStep,
+      phase_approval: {
+        ...conversation.phase_approval,
+        [currentStepKey]: true,
+      },
+      messages: [...conversation.messages, createAssistantMessage(approvalMessage(currentStep))],
     });
-  }, [agentStatus, chatHistory, homeChatStorageKeys, homeChatStorageOwner, isDialogPage, loadedHomeChatStorageOwner, loading]);
+    setAgentStatus(null);
+  };
 
-  useEffect(() => {
-    if (!isDialogPage) return;
-    if (!hasReachedConversationLimit) {
-      conversationLimitToastShownRef.current = false;
+  const continueRefine = () => {
+    setAgentStatus(null);
+    setInput('');
+  };
+
+  const sendMessage = async () => {
+    const message = input.trim();
+    if (!message || loading || !conversation) return;
+
+    if (isApprovalText(message) && currentStepKey && summary[currentStepKey].done && !isRefineText(message)) {
+      setInput('');
+      approveCurrentStep();
       return;
     }
-    if (conversationLimitToastShownRef.current) return;
-    conversationLimitToastShownRef.current = true;
-    setAgentStatus({ kind: 'error', message: CONVERSATION_LIMIT_NOTICE });
-  }, [hasReachedConversationLimit, isDialogPage]);
 
-  const handleSend = async () => {
-    const question = input.trim();
-    const storageKeys = homeChatStorageKeys;
-    if (!question || loading || !storageKeys || loadedHomeChatStorageOwner !== homeChatStorageOwner) return;
-    if (hasReachedConversationHardStop(chatHistory)) {
-      setAgentStatus({ kind: 'error', message: CONVERSATION_LIMIT_NOTICE });
+    window.dispatchEvent(new Event(SIDEBAR_COLLAPSE_EVENT));
+
+    const userMessage = createUserMessage(message);
+    if (summary.persona.done && isOffTopicForCurrentPersona(message, summary.persona.text)) {
+      persistConversation({
+        ...conversation,
+        messages: [...conversation.messages, userMessage, createAssistantMessage('新角色请新建对话，避免和当前人设混在一起。')],
+      });
+      setInput('');
+      setAgentStatus(null);
       return;
     }
-    suppressNextAbortStatusRef.current = false;
 
-    const conversationId = getOrCreateConversationId(DIALOG_CONVERSATION_ID_STORAGE_KEY);
-    const requestId = createClientEventId('dialog-turn');
-    const startedAt = Date.now();
-    const controller = new AbortController();
-    abortControllerRef.current = controller;
-    homeChatRuntime = { requestId, controller };
-    const userMessage: ChatMessage = {
-      id: Date.now(),
-      role: 'user',
-      content: question,
+    const nextMessages = [...conversation.messages, userMessage];
+    const pendingConversation = {
+      ...conversation,
+      messages: nextMessages,
     };
-    const nextHistory = [...chatHistory, userMessage];
-    pendingAutoScrollRef.current = true;
-    setChatHistory(nextHistory);
+    persistConversation(pendingConversation);
     setInput('');
     setLoading(true);
     setAgentStatus(null);
-    writeStoredHomeChatState(
-      storageKeys,
-      {
-        chatHistory: nextHistory,
-        loading: true,
-        agentStatus: null,
-        activeRequestId: requestId,
-      },
-      true,
-    );
-    void trackAnalyticsEvent({
-      eventName: 'conversation_turn_started',
-      module: 'dialog',
-      conversationId,
-      requestId,
-      taskType: 'general.chat',
-      turnIndex: nextHistory.filter((message) => message.role === 'user').length,
-      userMessageLength: question.length,
-      historyMessageCount: Math.max(nextHistory.length - 1, 0),
-      status: 'started',
-    });
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     try {
-      const response = await fetch(`${API_BASE}/api/chat`, {
+      const response = await fetch(`${API_BASE}${AGENT_CHAT_ENDPOINT}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
-          message: question,
-          conversationHistory: nextHistory.map((chat) => ({
-            role: chat.role,
-            content: chat.content,
-          })),
+          conversation_id: conversation.conversation_id,
+          message,
+          current_step: conversation.current_step,
+          selected_persona_id: conversation.selected_persona_id,
+          selected_topic_id: conversation.selected_topic_id,
         }),
         signal: controller.signal,
       });
-      const data = await response.json();
+      const data = (await response.json()) as AgentChatResponse & { detail?: string; msg?: string };
+
       if (!response.ok) {
-        if (cancelledHomeChatRequestIds.has(requestId)) return;
-        const errorStatus: AgentStatusState = { kind: 'error', message: data.detail || data.msg || '请求失败' };
-        setAgentStatus(errorStatus);
-        writeStoredHomeChatState(
-          storageKeys,
-          {
-            chatHistory: nextHistory,
-            loading: false,
-            agentStatus: errorStatus,
-            activeRequestId: '',
-          },
-          true,
-        );
+        setAgentStatus({ kind: 'error', message: data.detail || data.msg || '请求失败，请稍后重试。' });
         return;
       }
-      const assistantMessage: ChatMessage = {
-        id: Date.now() + 1,
-        role: 'assistant',
-        content: extractTextFromResponse(data.data || data),
-      };
-      if (cancelledHomeChatRequestIds.has(requestId)) return;
-      const finalHistory = [...nextHistory, assistantMessage];
-      pendingAutoScrollRef.current = true;
-      setChatHistory(finalHistory);
-      setAgentStatus(null);
-      writeStoredHomeChatState(
-        storageKeys,
-        {
-          chatHistory: finalHistory,
-          loading: false,
-          agentStatus: null,
-          activeRequestId: '',
-        },
-        true,
-      );
-      void trackAnalyticsEvent({
-        eventName: 'conversation_turn_completed',
-        module: 'dialog',
-        conversationId,
-        requestId,
-        taskType: 'general.chat',
-        turnIndex: nextHistory.filter((message) => message.role === 'user').length,
-        userMessageLength: question.length,
-        assistantMessageLength: assistantMessage.content.length,
-        historyMessageCount: nextHistory.length,
-        status: 'success',
-        latencyMs: Date.now() - startedAt,
+
+      const nextSummary = data.summary;
+      const stepKey = conversation.current_step === 'persona' || conversation.current_step === 'trending' || conversation.current_step === 'content'
+        ? conversation.current_step
+        : null;
+      const nextApproval = stepKey
+        ? {
+            ...conversation.phase_approval,
+            [stepKey]: false,
+          }
+        : conversation.phase_approval;
+      const nextContentPoints =
+        stepKey === 'content'
+          ? [
+              ...conversation.content_points,
+              {
+                id: `content_point_${Date.now()}`,
+                title: extractContentTitle(data.assistant_message.content || nextSummary.content.text),
+                message_id: data.assistant_message.id,
+              },
+            ]
+          : conversation.content_points;
+
+      persistConversation({
+        ...pendingConversation,
+        conversation_id: data.conversation_id,
+        title: buildConversationTitle(nextSummary, conversation.title),
+        summary: nextSummary,
+        selected_persona_id: data.memory_refs.persona_memory_id,
+        selected_topic_id: data.memory_refs.trending_memory_id,
+        phase_approval: nextApproval,
+        content_points: nextContentPoints,
+        messages: [...nextMessages, data.assistant_message],
       });
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') {
-        if (suppressNextAbortStatusRef.current || cancelledHomeChatRequestIds.has(requestId)) {
-          suppressNextAbortStatusRef.current = false;
-          return;
-        }
-        const stoppedStatus: AgentStatusState = { kind: 'stopped', message: '本次输出已停止。' };
-        setAgentStatus(stoppedStatus);
-        writeStoredHomeChatState(
-          storageKeys,
-          {
-            chatHistory: nextHistory,
-            loading: false,
-            agentStatus: stoppedStatus,
-            activeRequestId: '',
-          },
-          true,
-        );
-        void trackAnalyticsEvent({
-          eventName: 'conversation_turn_failed',
-          module: 'dialog',
-          conversationId,
-          requestId,
-          taskType: 'general.chat',
-          turnIndex: nextHistory.filter((message) => message.role === 'user').length,
-          userMessageLength: question.length,
-          historyMessageCount: nextHistory.length,
-          status: 'stopped',
-          latencyMs: Date.now() - startedAt,
-          failureReason: 'aborted',
-        });
+        setAgentStatus({ kind: 'stopped', message: '本次输出已停止。' });
         return;
       }
-      const errorStatus: AgentStatusState = { kind: 'error', message: '请求失败，请确认后端服务已启动。' };
-      setAgentStatus(errorStatus);
-      writeStoredHomeChatState(
-        storageKeys,
-        {
-          chatHistory: nextHistory,
-          loading: false,
-          agentStatus: errorStatus,
-          activeRequestId: '',
-        },
-        true,
-      );
-      void trackAnalyticsEvent({
-        eventName: 'conversation_turn_failed',
-        module: 'dialog',
-        conversationId,
-        requestId,
-        taskType: 'general.chat',
-        turnIndex: nextHistory.filter((message) => message.role === 'user').length,
-        userMessageLength: question.length,
-        historyMessageCount: nextHistory.length,
-        status: 'failed',
-        latencyMs: Date.now() - startedAt,
-        failureReason: error instanceof Error ? error.message : 'request_failed',
-      });
+      setAgentStatus({ kind: 'error', message: '请求失败，请确认服务已启动。' });
     } finally {
-      cancelledHomeChatRequestIds.delete(requestId);
-      if (homeChatRuntime?.requestId === requestId) {
-        homeChatRuntime = null;
-      }
       abortControllerRef.current = null;
       setLoading(false);
     }
@@ -438,278 +399,133 @@ function HomeContent() {
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (loading) return;
-    void handleSend();
+    void sendMessage();
   };
 
-  const handleStop = () => {
-    (homeChatRuntime?.controller || abortControllerRef.current)?.abort();
-  };
-
-  useEffect(() => {
-    if (chatHistory.length === 0) {
-      clearConversationId(DIALOG_CONVERSATION_ID_STORAGE_KEY);
-    }
-  }, [chatHistory.length]);
-
-  useEffect(() => {
-    if (!isDialogPage || !pendingAutoScrollRef.current) return;
-    pendingAutoScrollRef.current = false;
-    const container = chatContainerRef.current;
-    if (!container) return;
-    container.scrollTop = container.scrollHeight;
-    setShowScrollDown(false);
-  }, [chatHistory, isDialogPage, loading]);
-
-  useEffect(() => {
-    if (!isDialogPage || chatHistory.length === 0 || !pendingRestoreScrollRef.current || pendingAutoScrollRef.current) return;
-    pendingRestoreScrollRef.current = false;
-    const timer = window.setTimeout(() => {
-      const container = chatContainerRef.current;
-      if (!container) return;
-      if (!homeChatStorageKeys) return;
-      const savedTop = Number(window.localStorage.getItem(homeChatStorageKeys.scrollTop) || 0);
-      container.scrollTop = Number.isFinite(savedTop) ? savedTop : 0;
-      setShowScrollDown(container.scrollHeight - container.scrollTop - container.clientHeight > 160);
-    }, 0);
-    return () => window.clearTimeout(timer);
-  }, [chatHistory, homeChatStorageKeys, isDialogPage, loading]);
-
-  const scrollChatToBottom = () => {
-    const container = chatContainerRef.current;
-    if (!container) return;
-    container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
-    setShowScrollDown(false);
-  };
+  const handleStop = () => abortControllerRef.current?.abort();
 
   const handleNewChat = () => {
-    suppressNextAbortStatusRef.current = true;
-    if (homeChatRuntime?.requestId) {
-      cancelledHomeChatRequestIds.add(homeChatRuntime.requestId);
-    }
-    (homeChatRuntime?.controller || abortControllerRef.current)?.abort();
-    homeChatRuntime = null;
-    abortControllerRef.current = null;
-    pendingAutoScrollRef.current = false;
-    pendingRestoreScrollRef.current = false;
+    abortControllerRef.current?.abort();
     setInput('');
-    setChatHistory([]);
-    setLoading(false);
     setAgentStatus(null);
-    setShowScrollDown(false);
-    if (homeChatStorageKeys) {
-      clearStoredHomeChatState(homeChatStorageKeys, true);
-    }
-    clearConversationId(DIALOG_CONVERSATION_ID_STORAGE_KEY);
-    if (!isDialogPage) {
-      router.push('/manual');
-    }
+    setLoading(false);
+    setConversation(createAndStoreConversation());
   };
 
-  if (isDialogPage) {
-    return null;
-  }
-
-  const chatHeaderAction = (
-    <div className="flex shrink-0 flex-wrap items-center gap-3 self-start sm:self-center sm:justify-end">
-      <button
-        type="button"
-        onClick={handleNewChat}
-        className="koc-heading-font koc-primary-back-button shrink-0 rounded-full px-5 py-3 text-[18px] text-[var(--foreground)] transition hover:bg-[rgba(255,255,255,0.42)]"
-      >
-        新建
-      </button>
-      {!isAuthenticated && <LoginButton className="inline-flex shrink-0" />}
-    </div>
-  );
-
-  const showFloatingLoginButton = !isAuthenticated && !(isDialogPage && chatHistory.length > 0);
-
   return (
-    <div className="flex h-full w-full flex-col overflow-hidden px-[5.5vw] pb-7 pt-7">
-      {showFloatingLoginButton && (
-        <div className="mb-2 flex w-full shrink-0 justify-end">
-          <LoginButton />
+    <div className="flex min-h-0 w-full flex-1 flex-col px-[4vw] pb-6 pt-7">
+      <header className="mb-5 flex shrink-0 items-center justify-between gap-4">
+        <div className="min-w-0">
+          <h1 className="koc-heading-font truncate text-[24px] leading-tight text-[var(--foreground)]">KOC Agent</h1>
+          <p className="mt-1 text-[14px] text-[var(--muted-text)]">现在：{getCurrentStepTitle(currentStep)}。{getNextPrompt(currentStep)}</p>
         </div>
-      )}
-      <section className={`flex min-h-0 flex-1 flex-col ${chatHistory.length > 0 && isDialogPage ? '' : 'items-center'}`}>
-        <div
-          className={`w-full ${
-            chatHistory.length > 0 && isDialogPage
-              ? 'mx-auto flex min-h-0 max-w-[980px] flex-1 flex-col'
-              : showDialogLandingLayout
-                ? 'mx-auto flex min-h-full max-w-[1320px] flex-1 flex-col'
-                : showCenteredHomeLayout
-                  ? 'relative flex min-h-full max-w-[1320px] flex-1 flex-col items-center justify-center'
-                  : 'flex min-h-full max-w-[1200px] flex-1 flex-col items-center justify-between py-[8vh]'
-          }`}
+        <button
+          type="button"
+          onClick={handleNewChat}
+          className="koc-heading-font shrink-0 rounded-full border border-[var(--box-border)] bg-white px-5 py-3 text-[15px] text-[var(--foreground)] shadow-[var(--box-shadow)] transition hover:bg-[var(--nav-hover)]"
         >
-          {chatHistory.length > 0 && isDialogPage ? (
-            <section className="relative flex min-h-0 flex-1 flex-col">
-              <ScenarioHeader
-                title="灵光小猪梨"
-                subtitle="支持临时灵感记录、资料追问和多轮上下文延续"
-                action={chatHeaderAction}
-              />
+          新建对话 / 新角色
+        </button>
+      </header>
 
-              <div
-                ref={chatContainerRef}
-                onScroll={(event) => {
-                  const el = event.currentTarget;
-                  if (homeChatStorageKeys) {
-                    window.localStorage.setItem(homeChatStorageKeys.scrollTop, String(el.scrollTop));
-                  }
-                  setShowScrollDown(el.scrollHeight - el.scrollTop - el.clientHeight > 160);
-                }}
-                className="mx-auto min-h-0 w-full max-w-[980px] flex-1 space-y-4 overflow-y-auto px-5 pb-8 text-[15px] leading-[1.7] text-[var(--foreground)] sm:px-7"
-              >
-                {chatHistory.map((chat, index) => (
-                  <div key={chat.id} className={`flex ${chat.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                    {chat.role === 'user' ? (
-                      <ChatMessageBubble variant="user" inheritTextColor>
-                        <MarkdownText content={chat.content} inheritTextColor />
-                      </ChatMessageBubble>
-                    ) : (
-                      <div className="mr-[12%] w-full max-w-[min(74%,720px)] space-y-3">
-                        <ChatMessageBubble variant="assistant">
-                          <MarkdownText content={chat.content} />
-                        </ChatMessageBubble>
-                        <MessageActions
-                          copyEvent={buildDialogCopyEvent(chat, index)}
-                          copyText={chat.content}
-                        />
-                      </div>
-                    )}
+      <div className={`grid min-h-0 flex-1 gap-5 ${shouldShowSummary ? 'lg:grid-cols-[minmax(0,1fr)_320px]' : 'lg:grid-cols-[minmax(0,1fr)]'}`}>
+        <section className="relative flex min-h-0 flex-col rounded-[20px] border border-[var(--box-border)] bg-white shadow-[var(--box-shadow)]">
+          <div
+            ref={chatContainerRef}
+            onScroll={(event) => {
+              const el = event.currentTarget;
+              setShowScrollDown(el.scrollHeight - el.scrollTop - el.clientHeight > 160);
+            }}
+            className="min-h-0 flex-1 space-y-5 overflow-y-auto px-5 py-6 text-[15px] leading-[1.75] text-[var(--foreground)] sm:px-7"
+          >
+            {messages.map((message) => (
+              <div id={`agent-message-${message.id}`} key={message.id} className={`flex scroll-mt-6 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                {message.role === 'user' ? (
+                  <ChatMessageBubble variant="user" inheritTextColor>
+                    <MarkdownText content={message.content} inheritTextColor />
+                  </ChatMessageBubble>
+                ) : (
+                  <div className="mr-[8%] w-full max-w-[min(82%,760px)]">
+                    <ChatMessageBubble variant="assistant">
+                      <MarkdownText content={message.content} />
+                    </ChatMessageBubble>
                   </div>
-                ))}
-                {agentStatus && !loading && <AgentStatusMessage status={agentStatus} />}
-                {loading && <AgentStatusMessage status={{ kind: 'running', message: '小猪梨灵感加载中...' }} />}
+                )}
               </div>
-              {showScrollDown && (
-                <ScrollToBottomButton onClick={scrollChatToBottom} />
-              )}
+            ))}
 
-              <ChatInputShell>
-                <form
-                  onSubmit={handleSubmit}
-                  className="koc-chat-input-surface flex h-[72px] items-center rounded-full border border-[var(--box-border)] bg-[rgba(255,255,255,0.96)] px-5 sm:px-7"
+            {shouldShowApproval && (
+              <div className="flex flex-wrap gap-3 pl-1">
+                <button
+                  type="button"
+                  onClick={approveCurrentStep}
+                  className="rounded-full bg-[var(--primary)] px-4 py-2 text-[14px] font-semibold text-white shadow-[var(--cta-shadow)] transition hover:bg-[var(--primary-hover)]"
                 >
-                  <input
-                    value={input}
-                    onChange={(event) => setInput(event.target.value)}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter' && loading) {
-                        event.preventDefault();
-                      }
-                    }}
-                    placeholder={hasReachedConversationLimit ? CONVERSATION_LIMIT_NOTICE : loading ? '等待回复中…' : '可输入你的灵光一闪'}
-                    className="koc-song-font koc-chat-placeholder min-w-0 flex-1 bg-transparent text-[16px] text-[var(--foreground)] outline-none sm:text-[17px]"
-                    disabled={hasReachedConversationLimit}
-                  />
-                  <button
-                    type="button"
-                    onClick={loading ? handleStop : () => void handleSend()}
-                    disabled={(!loading && !input.trim()) || hasReachedConversationLimit}
-                    className="grid size-11 place-items-center text-[29px] text-[var(--foreground)] transition hover:scale-105 disabled:cursor-not-allowed disabled:opacity-45"
-                    aria-label={loading ? '停止生成' : '发送'}
-                    title={loading ? '停止生成' : '发送'}
-                    >
-                      {loading ? <StopGenerationIcon /> : <Image src="/koc-assets/icons/图标/发送.svg" alt="" width={24} height={24} className="size-[24px]" />}
-                    </button>
-                </form>
-              </ChatInputShell>
-            </section>
-          ) : showDialogLandingLayout ? (
-            <section className="relative flex min-h-full flex-1 flex-col">
-              <div className="absolute left-1/2 top-[44%] w-full max-w-[1100px] -translate-x-1/2 -translate-y-1/2 text-center">
-                <h1 className="koc-title-font koc-gradient-title whitespace-pre-line text-[34px] leading-[1.08] sm:text-[64px] sm:leading-[0.98] lg:text-[78px] lg:leading-[0.94]">
-                  {introCopy.title}
-                </h1>
+                  {approvalButtonLabel(currentStep)}
+                </button>
+                <button
+                  type="button"
+                  onClick={continueRefine}
+                  className="rounded-full border border-[var(--box-border)] bg-white px-4 py-2 text-[14px] font-semibold text-[var(--foreground)] shadow-[var(--box-shadow)] transition hover:bg-[var(--nav-hover)]"
+                >
+                  继续完善
+                </button>
               </div>
+            )}
 
-              <div className="absolute bottom-[6vh] left-1/2 w-full max-w-[980px] -translate-x-1/2">
-                <div className="koc-song-font mb-7 space-y-3 text-center text-[18px] leading-[1.5] text-[var(--foreground)] sm:text-[24px] lg:text-[29px]">
-                  {introCopy.lines.map((line) => (
-                    <p key={line}>{line}</p>
-                  ))}
-                </div>
+            {agentStatus && !loading && <AgentStatusMessage status={agentStatus} />}
+            {loading && <AgentStatusMessage status={{ kind: 'running', message: 'KOC Agent 正在整理下一步...' }} />}
+          </div>
 
-                <ChatInputShell className="w-full" compact>
-                  <form
-                    onSubmit={handleSubmit}
-                    className="koc-chat-input-surface flex h-[72px] w-full items-center rounded-full border border-[var(--box-border)] bg-[rgba(255,255,255,0.96)] px-7"
-                  >
-                    <input
-                      value={input}
-                      onChange={(event) => setInput(event.target.value)}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter' && loading) {
-                        event.preventDefault();
-                      }
-                    }}
-                    placeholder={hasReachedConversationLimit ? CONVERSATION_LIMIT_NOTICE : loading ? '等待回复中…' : '可输入你的灵光一闪'}
-                    className="koc-song-font koc-chat-placeholder min-w-0 flex-1 bg-transparent text-[16px] text-[var(--foreground)] outline-none sm:text-[17px]"
-                    disabled={hasReachedConversationLimit}
-                    />
-                    <button
-                      type="button"
-                      onClick={loading ? handleStop : () => void handleSend()}
-                      disabled={(!loading && !input.trim()) || hasReachedConversationLimit}
-                      className="grid size-11 place-items-center text-[29px] text-[var(--foreground)] transition hover:scale-105 disabled:cursor-not-allowed disabled:opacity-45"
-                      aria-label={loading ? '停止生成' : '发送'}
-                      title={loading ? '停止生成' : '发送'}
-                    >
-                      {loading ? <StopGenerationIcon /> : <Image src="/koc-assets/icons/图标/发送.svg" alt="" width={24} height={24} className="size-[24px]" />}
-                    </button>
-                  </form>
-                  {agentStatus && !loading && (
-                    <div className="mt-4 flex justify-center">
-                      <AgentStatusMessage status={agentStatus} />
-                    </div>
-                  )}
-                </ChatInputShell>
-              </div>
-            </section>
-          ) : (
-            <>
-              <div
-                className={`${
-                  showCenteredHomeLayout
-                      ? 'relative min-h-full w-full flex-1'
-                      : ''
-                }`}
+          {showScrollDown && <ScrollToBottomButton onClick={scrollChatToBottom} />}
+
+          <ChatInputShell className="px-5 sm:px-7">
+            <form onSubmit={handleSubmit} className="koc-chat-input-surface flex min-h-[72px] items-center rounded-full border border-[var(--box-border)] bg-[rgba(255,255,255,0.98)] px-5 sm:px-7">
+              <input
+                value={input}
+                onChange={(event) => setInput(event.target.value)}
+                placeholder={loading ? '等待回复中…' : getNextPrompt(currentStep)}
+                className="koc-song-font koc-chat-placeholder min-w-0 flex-1 bg-transparent text-[16px] text-[var(--foreground)] outline-none sm:text-[17px]"
+                disabled={loading}
+              />
+              <button
+                type="button"
+                onClick={loading ? handleStop : () => void sendMessage()}
+                disabled={!loading && !input.trim()}
+                className="grid size-11 place-items-center text-[29px] text-[var(--foreground)] transition hover:scale-105 disabled:cursor-not-allowed disabled:opacity-45"
+                aria-label={loading ? '停止生成' : '发送'}
+                title={loading ? '停止生成' : '发送'}
               >
-                <h1
-                  className={`koc-title-font koc-gradient-title ${
-                    showCenteredHomeLayout ? 'absolute left-1/2 top-[44%] w-full max-w-[1100px] -translate-x-1/2 -translate-y-1/2 whitespace-pre-line text-[34px] leading-[1.08] sm:text-[64px] sm:leading-[1] lg:text-[78px] lg:leading-[0.96]' : 'whitespace-pre-line text-[34px] leading-[1.08] sm:text-[38px]'
-                  } text-center`}
-                >
-                  {`${introCopy.title}\n我是你的小猪梨`}
-                </h1>
-                <div
-                  className={`${
-                    showCenteredHomeLayout
-                        ? 'koc-song-font absolute bottom-[7vh] left-1/2 w-full max-w-[1100px] -translate-x-1/2 text-center text-[18px] leading-[1.45] sm:text-[22px] sm:leading-[1.5] lg:text-[26px] lg:leading-[1.55]'
-                        : 'koc-song-font mt-auto text-center text-[18px] leading-[1.45] sm:text-[28px] sm:leading-[1.55]'
-                  } space-y-3 text-[var(--foreground)]`}
-                >
-                  {introCopy.lines.map((line) => (
-                    <p key={line}>{line}</p>
-                  ))}
-                </div>
-              </div>
-            </>
-          )}
-        </div>
-      </section>
-    </div>
-  );
-}
+                {loading ? <StopGenerationIcon /> : <Image src="/koc-assets/icons/图标/发送.svg" alt="" width={24} height={24} className="size-[24px]" />}
+              </button>
+            </form>
+          </ChatInputShell>
+        </section>
 
-export default function Home() {
-  return (
-    <Suspense fallback={null}>
-      <HomeContent />
-    </Suspense>
+        {shouldShowSummary && (
+          <aside className="flex min-h-0 flex-col rounded-[20px] border border-[var(--box-border)] bg-white p-5 shadow-[var(--box-shadow)]">
+            <div className="shrink-0">
+              <p className="koc-heading-font text-[18px] leading-tight text-[var(--foreground)]">流程摘要</p>
+              <p className="mt-2 text-[13px] leading-6 text-[var(--muted-text)]">
+                {currentRoleText ? `当前对话：${currentRoleText}` : '一个对话只对应一个角色。'}
+              </p>
+            </div>
+            <div className="mt-5 min-h-0 flex-1 space-y-3 overflow-y-auto">
+              {stepOrder.map((step) => (
+                <FlowSummaryBlock
+                  key={step.key}
+                  item={summary[step.key]}
+                  contentPoints={step.key === 'content' ? conversation?.content_points : undefined}
+                  fallbackTitle={step.title}
+                  fallbackHint={step.hint}
+                  active={currentStep === step.step}
+                  onTrace={scrollToMessage}
+                />
+              ))}
+            </div>
+          </aside>
+        )}
+      </div>
+    </div>
   );
 }
