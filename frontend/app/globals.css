@@ -147,6 +147,11 @@ input[type="radio"]:checked {
   background: var(--primary);
 }
 
+input[type="password"]::-ms-reveal,
+input[type="password"]::-ms-clear {
+  display: none;
+}
+
 .koc-app-shell {
   min-height: 100vh;
   height: 100vh;

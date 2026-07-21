@@ -3,6 +3,7 @@
 import { useEffect, useRef } from 'react';
 import { useAppState } from '@/context/AppStateContext';
 import { useAuth } from '@/context/AuthContext';
+import { PERSONA_STORAGE_KEY } from '@/lib/persona';
 
 const SESSION_KEYS_TO_CLEAR = [
   'koc-agent-profile-chat-state',
@@ -28,6 +29,7 @@ export default function AuthStateBridge() {
     if (previousStatus !== 'authenticated' || status !== 'anonymous') return;
 
     dispatch({ type: 'CLEAR_PERSONA' });
+    window.localStorage.removeItem(PERSONA_STORAGE_KEY);
     SESSION_KEYS_TO_CLEAR.forEach((key) => window.sessionStorage.removeItem(key));
   }, [dispatch, status]);
 

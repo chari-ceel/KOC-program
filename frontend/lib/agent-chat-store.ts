@@ -2,6 +2,8 @@ import type { AgentFlowSummary, AgentLocalConversation, AgentMessage } from '@/l
 
 export const AGENT_CHAT_CONVERSATIONS_STORAGE_KEY = 'koc-agent-local-conversations';
 export const AGENT_CHAT_ACTIVE_CONVERSATION_STORAGE_KEY = 'koc-agent-active-conversation-id';
+const AGENT_CHAT_ACCOUNT_SCOPE_STORAGE_KEY = 'koc-agent-account-scope';
+const DEFAULT_ACCOUNT_SCOPE = 'anonymous';
 export const AGENT_CHAT_CONVERSATIONS_UPDATED_EVENT = 'koc-agent-conversations-updated';
 export const AGENT_CHAT_CREATE_CONVERSATION_EVENT = 'koc-agent-create-conversation';
 export const AGENT_CHAT_SELECT_CONVERSATION_EVENT = 'koc-agent-select-conversation';
@@ -49,6 +51,40 @@ function emitConversationsUpdated() {
   window.dispatchEvent(new Event(AGENT_CHAT_CONVERSATIONS_UPDATED_EVENT));
 }
 
+function normalizeScope(value?: string | null) {
+  const normalized = (value || '').trim();
+  return normalized || DEFAULT_ACCOUNT_SCOPE;
+}
+
+function scopedStorageKey(baseKey: string, scope = readAgentChatAccountScope()) {
+  return `${baseKey}:${scope}`;
+}
+
+export function readAgentChatAccountScope() {
+  if (typeof window === 'undefined') return DEFAULT_ACCOUNT_SCOPE;
+  return normalizeScope(window.localStorage.getItem(AGENT_CHAT_ACCOUNT_SCOPE_STORAGE_KEY));
+}
+
+export function setAgentChatAccountScope(accountId?: string | null) {
+  if (typeof window === 'undefined') return;
+  const nextScope = normalizeScope(accountId);
+  const previousScope = readAgentChatAccountScope();
+  window.localStorage.setItem(AGENT_CHAT_ACCOUNT_SCOPE_STORAGE_KEY, nextScope);
+  if (previousScope !== nextScope) {
+    emitConversationsUpdated();
+  }
+}
+
+export function clearAgentChatScopeData(accountId?: string | null) {
+  if (typeof window === 'undefined') return;
+  const scope = normalizeScope(accountId);
+  window.localStorage.removeItem(scopedStorageKey(AGENT_CHAT_CONVERSATIONS_STORAGE_KEY, scope));
+  window.localStorage.removeItem(scopedStorageKey(AGENT_CHAT_ACTIVE_CONVERSATION_STORAGE_KEY, scope));
+  if (scope === readAgentChatAccountScope()) {
+    emitConversationsUpdated();
+  }
+}
+
 export function createEmptyConversation(index = 1): AgentLocalConversation {
   return {
     local_id: createLocalId(),
@@ -71,7 +107,12 @@ export function createEmptyConversation(index = 1): AgentLocalConversation {
 export function readLocalConversations(): AgentLocalConversation[] {
   if (typeof window === 'undefined') return [];
   try {
-    const raw = window.localStorage.getItem(AGENT_CHAT_CONVERSATIONS_STORAGE_KEY);
+    const scopedKey = scopedStorageKey(AGENT_CHAT_CONVERSATIONS_STORAGE_KEY);
+    const legacyRaw =
+      readAgentChatAccountScope() === DEFAULT_ACCOUNT_SCOPE
+        ? window.localStorage.getItem(AGENT_CHAT_CONVERSATIONS_STORAGE_KEY)
+        : null;
+    const raw = window.localStorage.getItem(scopedKey) || legacyRaw;
     if (!raw) return [];
     const parsed = JSON.parse(raw) as AgentLocalConversation[];
     if (!Array.isArray(parsed)) return [];
@@ -100,18 +141,27 @@ export function readLocalConversations(): AgentLocalConversation[] {
 
 export function writeLocalConversations(conversations: AgentLocalConversation[]) {
   if (typeof window === 'undefined') return;
-  window.localStorage.setItem(AGENT_CHAT_CONVERSATIONS_STORAGE_KEY, JSON.stringify(conversations));
+  window.localStorage.setItem(scopedStorageKey(AGENT_CHAT_CONVERSATIONS_STORAGE_KEY), JSON.stringify(conversations));
   emitConversationsUpdated();
 }
 
 export function readActiveConversationId() {
   if (typeof window === 'undefined') return '';
-  return window.localStorage.getItem(AGENT_CHAT_ACTIVE_CONVERSATION_STORAGE_KEY) || '';
+  const scopedValue = window.localStorage.getItem(scopedStorageKey(AGENT_CHAT_ACTIVE_CONVERSATION_STORAGE_KEY));
+  if (scopedValue) return scopedValue;
+  return readAgentChatAccountScope() === DEFAULT_ACCOUNT_SCOPE
+    ? window.localStorage.getItem(AGENT_CHAT_ACTIVE_CONVERSATION_STORAGE_KEY) || ''
+    : '';
 }
 
 export function writeActiveConversationId(localId: string) {
   if (typeof window === 'undefined') return;
-  window.localStorage.setItem(AGENT_CHAT_ACTIVE_CONVERSATION_STORAGE_KEY, localId);
+  const key = scopedStorageKey(AGENT_CHAT_ACTIVE_CONVERSATION_STORAGE_KEY);
+  if (localId) {
+    window.localStorage.setItem(key, localId);
+  } else {
+    window.localStorage.removeItem(key);
+  }
   emitConversationsUpdated();
 }
 
@@ -129,10 +179,31 @@ export function upsertLocalConversation(conversation: AgentLocalConversation) {
   return nextConversation;
 }
 
+export function hasCompletedPersona(conversation: AgentLocalConversation | null | undefined) {
+  return Boolean(conversation?.summary?.persona?.done && conversation.summary.persona.text.trim());
+}
+
+export function canCreateNextConversation(conversations: AgentLocalConversation[], activeLocalId = '') {
+  if (conversations.length === 0) return true;
+  const activeConversation = conversations.find((conversation) => conversation.local_id === activeLocalId) || conversations[0];
+  return hasCompletedPersona(activeConversation);
+}
+
 export function createAndStoreConversation() {
   const conversations = readLocalConversations();
   const conversation = createEmptyConversation(conversations.length + 1);
   writeLocalConversations([conversation, ...conversations]);
   writeActiveConversationId(conversation.local_id);
   return conversation;
+}
+
+export function deleteLocalConversation(localId: string) {
+  const conversations = readLocalConversations();
+  const nextConversations = conversations.filter((conversation) => conversation.local_id !== localId);
+  const activeId = readActiveConversationId();
+  writeLocalConversations(nextConversations);
+  if (activeId === localId) {
+    writeActiveConversationId(nextConversations[0]?.local_id || '');
+  }
+  return nextConversations;
 }

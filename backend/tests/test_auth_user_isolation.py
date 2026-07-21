@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from fastapi.testclient import TestClient
 
+from backend.app.endpoints.web import auth as auth_endpoint
 from backend.app.main import app
 from backend.app.endpoints.web import content as content_endpoint
 from backend.app.endpoints.web import persona as persona_endpoint
@@ -117,3 +118,20 @@ def test_content_save_normalizes_title_to_structured_note_title(monkeypatch) -> 
     assert captured["user_id"] == "real-user"
     assert captured["draft"]["title"] == "保存后的笔记标题"
     assert response.json()["data"]["title"] == "保存后的笔记标题"
+
+
+def test_auth_switch_sets_session_for_known_account(monkeypatch) -> None:
+    captured = {}
+
+    def fake_switch_user(user_id: str):
+        captured["user_id"] = user_id
+        return {"userId": user_id, "username": "next@test", "name": "Next", "avatar": ""}, "session-next"
+
+    monkeypatch.setattr(auth_endpoint.auth_service, "switch_user", fake_switch_user)
+
+    response = client.post("/api/auth/switch", json={"user_id": "user-next"})
+
+    assert response.status_code == 200
+    assert response.json()["data"]["user"]["userId"] == "user-next"
+    assert "koc_session=session-next" in response.headers["set-cookie"]
+    assert captured == {"user_id": "user-next"}

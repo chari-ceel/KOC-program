@@ -112,6 +112,20 @@ class FakeMemoryCRUD:
             if memory_user == user_id and memory_conversation == conversation_id and memory["module"] == module
         ][:limit]
 
+    def delete_agent_chat_conversation(self, user_id: str, conversation_id: str):
+        deleted = self.conversations.pop((user_id, conversation_id), None) is not None
+        self.messages = [
+            message
+            for message in self.messages
+            if not (message["user_id"] == user_id and message["conversation_id"] == conversation_id)
+        ]
+        self.memories = {
+            key: memory
+            for key, memory in self.memories.items()
+            if not (key[0] == user_id and key[1] == conversation_id)
+        }
+        return deleted
+
 
 class FakePersonaService:
     async def analyze(self, user_id: str, basic_info: dict, persist: bool = True, agent_debug=None):
@@ -330,3 +344,18 @@ async def test_conversation_history_is_named_by_persona_summary():
     assert first["conversation_title"]
     assert history["conversations"][0]["title"] == first["conversation_title"]
     assert "真实测评平价好物" in history["conversations"][0]["title"]
+
+
+@pytest.mark.anyio
+async def test_delete_conversation_removes_messages_and_memories():
+    memory = FakeMemoryCRUD()
+    service = build_service(memory)
+
+    first = await service.chat(user_id="user-a", message="我是美妆博主")
+    await service.chat(user_id="user-a", conversation_id=first["conversation_id"], message="推荐选题")
+
+    response = service.delete_conversation(user_id="user-a", conversation_id=first["conversation_id"])
+
+    assert response["data"]["deleted"] is True
+    assert memory.get_agent_chat_conversation("user-a", first["conversation_id"]) is None
+    assert memory.list_agent_chat_messages("user-a", first["conversation_id"]) == []

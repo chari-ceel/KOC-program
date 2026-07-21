@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import Image from 'next/image';
 import { API_BASE } from '@/lib/api';
 import {
@@ -14,9 +14,11 @@ import {
   type AgentStep,
 } from '@/lib/agent-chat-contract';
 import {
+  AGENT_CHAT_CONVERSATIONS_UPDATED_EVENT,
   AGENT_CHAT_CREATE_CONVERSATION_EVENT,
   AGENT_CHAT_SELECT_CONVERSATION_EVENT,
   SIDEBAR_COLLAPSE_EVENT,
+  canCreateNextConversation,
   createAndStoreConversation,
   createWelcomeMessage,
   defaultAgentSummary,
@@ -24,13 +26,16 @@ import {
   readLocalConversations,
   upsertLocalConversation,
 } from '@/lib/agent-chat-store';
+import LoginButton from '@/components/LoginButton';
 import AgentStatusMessage from '@/components/AgentStatusMessage';
 import ChatInputShell from '@/components/ChatInputShell';
 import ChatMessageBubble from '@/components/ChatMessageBubble';
 import MarkdownText from '@/components/MarkdownText';
 import ScrollToBottomButton from '@/components/ScrollToBottomButton';
 import StopGenerationIcon from '@/components/StopGenerationIcon';
+import { useAuth } from '@/context/AuthContext';
 import type { AgentStatusState } from '@/lib/agent-status';
+import { ANONYMOUS_PERSONA_GENERATED_STORAGE_KEY } from '@/lib/persona';
 
 type FlowSummaryKey = keyof AgentFlowSummary;
 
@@ -77,9 +82,14 @@ function buildConversationTitle(summary: AgentFlowSummary, fallback: string) {
   return compactText(summary.persona.text, 14) || fallback;
 }
 
-function getCurrentStepTitle(step: AgentStep) {
-  if (step === 'done') return '流程已完成';
-  return stepOrder.find((item) => item.step === step)?.title ?? '人设打造';
+function hasUsedAnonymousPersonaTrial() {
+  if (typeof window === 'undefined') return false;
+  return window.localStorage.getItem(ANONYMOUS_PERSONA_GENERATED_STORAGE_KEY) === '1';
+}
+
+function markAnonymousPersonaTrialUsed() {
+  if (typeof window === 'undefined') return;
+  window.localStorage.setItem(ANONYMOUS_PERSONA_GENERATED_STORAGE_KEY, '1');
 }
 
 function getNextPrompt(step: AgentStep) {
@@ -216,12 +226,14 @@ function FlowSummaryBlock({
 }
 
 export default function Home() {
+  const { status, isAuthenticated, openUnlockDialog } = useAuth();
   const [input, setInput] = useState('');
   const [conversation, setConversation] = useState<AgentLocalConversation | null>(null);
   const [loading, setLoading] = useState(false);
   const [agentStatus, setAgentStatus] = useState<AgentStatusState | null>(null);
   const [showScrollDown, setShowScrollDown] = useState(false);
   const chatContainerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
   const messages = conversation?.messages ?? [createWelcomeMessage()];
@@ -232,6 +244,20 @@ export default function Home() {
   const currentStepKey = currentStep === 'persona' || currentStep === 'trending' || currentStep === 'content' ? currentStep : null;
   const shouldShowApproval =
     Boolean(conversation && currentStepKey && summary[currentStepKey].done && !conversation.phase_approval[currentStepKey] && !loading);
+  const isAnonymous = status === 'anonymous';
+  const isCheckingAuth = status === 'loading';
+
+  const openGuestLimitDialog = useCallback((title = '登录后解锁完整功能') => {
+    openUnlockDialog({
+      title,
+      descriptionLines: [
+        '当前是游客模式。',
+        '你可以免费生成一次初版人设：继续追问、保存人设、热门追踪和内容撰写需要登录。',
+      ],
+      redirectTo: '/',
+      closeRedirectTo: '/',
+    });
+  }, [openUnlockDialog]);
 
   const persistConversation = useCallback((nextConversation: AgentLocalConversation) => {
     const saved = upsertLocalConversation(nextConversation);
@@ -252,11 +278,14 @@ export default function Home() {
     loadConversation();
     const handleCreate = (event: Event) => loadConversation((event as CustomEvent<{ localId?: string }>).detail?.localId);
     const handleSelect = (event: Event) => loadConversation((event as CustomEvent<{ localId?: string }>).detail?.localId);
+    const handleUpdated = () => loadConversation();
     window.addEventListener(AGENT_CHAT_CREATE_CONVERSATION_EVENT, handleCreate);
     window.addEventListener(AGENT_CHAT_SELECT_CONVERSATION_EVENT, handleSelect);
+    window.addEventListener(AGENT_CHAT_CONVERSATIONS_UPDATED_EVENT, handleUpdated);
     return () => {
       window.removeEventListener(AGENT_CHAT_CREATE_CONVERSATION_EVENT, handleCreate);
       window.removeEventListener(AGENT_CHAT_SELECT_CONVERSATION_EVENT, handleSelect);
+      window.removeEventListener(AGENT_CHAT_CONVERSATIONS_UPDATED_EVENT, handleUpdated);
     };
   }, [loadConversation]);
 
@@ -278,8 +307,12 @@ export default function Home() {
 
   const approveCurrentStep = () => {
     if (!conversation || !currentStepKey) return;
+    if (!isAuthenticated) {
+      openGuestLimitDialog('登录后继续下一步');
+      return;
+    }
     const nextStep = nextStepAfterApproval(currentStep);
-    persistConversation({
+    const nextConversation = {
       ...conversation,
       current_step: nextStep,
       phase_approval: {
@@ -287,23 +320,40 @@ export default function Home() {
         [currentStepKey]: true,
       },
       messages: [...conversation.messages, createAssistantMessage(approvalMessage(currentStep))],
-    });
+    };
+    persistConversation(nextConversation);
     setAgentStatus(null);
   };
 
   const continueRefine = () => {
+    if (!isAuthenticated && (summary.persona.done || hasUsedAnonymousPersonaTrial())) {
+      openGuestLimitDialog('登录后继续追问');
+      return;
+    }
     setAgentStatus(null);
     setInput('');
+    window.setTimeout(() => inputRef.current?.focus(), 0);
   };
 
   const sendMessage = async () => {
     const message = input.trim();
     if (!message || loading || !conversation) return;
+    if (isCheckingAuth) {
+      setAgentStatus({ kind: 'running', message: '正在确认登录状态，请稍等。' });
+      return;
+    }
 
     if (isApprovalText(message) && currentStepKey && summary[currentStepKey].done && !isRefineText(message)) {
       setInput('');
       approveCurrentStep();
       return;
+    }
+
+    if (!isAuthenticated) {
+      if (conversation.current_step !== 'persona' || hasUsedAnonymousPersonaTrial()) {
+        openGuestLimitDialog(conversation.current_step === 'persona' ? '登录后继续完善人设' : '登录后解锁完整流程');
+        return;
+      }
     }
 
     window.dispatchEvent(new Event(SIDEBAR_COLLAPSE_EVENT));
@@ -374,6 +424,10 @@ export default function Home() {
             ]
           : conversation.content_points;
 
+      if (!isAuthenticated && stepKey === 'persona') {
+        markAnonymousPersonaTrialUsed();
+      }
+
       persistConversation({
         ...pendingConversation,
         conversation_id: data.conversation_id,
@@ -405,6 +459,19 @@ export default function Home() {
   const handleStop = () => abortControllerRef.current?.abort();
 
   const handleNewChat = () => {
+    if (isCheckingAuth) {
+      setAgentStatus({ kind: 'running', message: '正在确认登录状态，请稍等。' });
+      return;
+    }
+    const conversations = readLocalConversations();
+    if (!canCreateNextConversation(conversations, conversation?.local_id)) {
+      setAgentStatus({ kind: 'error', message: '请先完成当前人设打造，再新建下一个角色对话。' });
+      return;
+    }
+    if (!isAuthenticated && hasUsedAnonymousPersonaTrial()) {
+      openGuestLimitDialog('登录后新建更多角色对话');
+      return;
+    }
     abortControllerRef.current?.abort();
     setInput('');
     setAgentStatus(null);
@@ -416,8 +483,8 @@ export default function Home() {
     <div className="flex min-h-0 w-full flex-1 flex-col px-[4vw] pb-6 pt-7">
       <header className="mb-5 flex shrink-0 items-center justify-between gap-4">
         <div className="min-w-0">
-          <h1 className="koc-heading-font truncate text-[24px] leading-tight text-[var(--foreground)]">KOC Agent</h1>
-          <p className="mt-1 text-[14px] text-[var(--muted-text)]">现在：{getCurrentStepTitle(currentStep)}。{getNextPrompt(currentStep)}</p>
+          <h1 className="koc-heading-font truncate text-[26px] leading-tight text-[var(--foreground)]">顶流小猪梨</h1>
+          <p className="mt-1 text-[14px] text-[var(--muted-text)]">你的顶流打造小助手~</p>
         </div>
         <button
           type="button"
@@ -427,6 +494,16 @@ export default function Home() {
           新建对话 / 新角色
         </button>
       </header>
+
+      {isAnonymous && (
+        <div className="mb-5 flex shrink-0 flex-col gap-3 rounded-[18px] border border-[#bfdbfe] bg-[#eff6ff] px-5 py-4 text-[var(--foreground)] shadow-[var(--box-shadow)] sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="koc-heading-font text-[16px] leading-tight text-[var(--foreground)]">当前是游客模式</p>
+            <p className="mt-1 text-[13px] leading-6 text-[var(--muted-text)]">你可以免费生成一次初版人设：继续追问、保存人设、热门追踪和内容撰写需要登录</p>
+          </div>
+          <LoginButton className="shrink-0 self-start px-5 py-2 text-[15px] sm:self-center" />
+        </div>
+      )}
 
       <div className={`grid min-h-0 flex-1 gap-5 ${shouldShowSummary ? 'lg:grid-cols-[minmax(0,1fr)_320px]' : 'lg:grid-cols-[minmax(0,1fr)]'}`}>
         <section className="relative flex min-h-0 flex-col rounded-[20px] border border-[var(--box-border)] bg-white shadow-[var(--box-shadow)]">
@@ -482,6 +559,7 @@ export default function Home() {
           <ChatInputShell className="px-5 sm:px-7">
             <form onSubmit={handleSubmit} className="koc-chat-input-surface flex min-h-[72px] items-center rounded-full border border-[var(--box-border)] bg-[rgba(255,255,255,0.98)] px-5 sm:px-7">
               <input
+                ref={inputRef}
                 value={input}
                 onChange={(event) => setInput(event.target.value)}
                 placeholder={loading ? '等待回复中…' : getNextPrompt(currentStep)}

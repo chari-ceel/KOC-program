@@ -207,6 +207,10 @@ class UnifiedAgentChatService:
             "updated_at": self._iso(conversation.get("updated_at")),
         }
 
+    def delete_conversation(self, *, user_id: str, conversation_id: str) -> Dict[str, Any]:
+        deleted = self.memory_crud.delete_agent_chat_conversation(user_id, conversation_id)
+        return {"code": 200, "data": {"deleted": deleted, "conversation_id": conversation_id}}
+
     def _load_or_create_conversation(self, user_id: str, conversation_id: str) -> Dict[str, Any]:
         existing = self.memory_crud.get_agent_chat_conversation(user_id, conversation_id)
         if existing:

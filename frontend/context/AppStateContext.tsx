@@ -467,9 +467,11 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     if (status === 'loading') return;
     if (status !== 'authenticated') {
       dispatch({ type: 'CLEAR_USER_DATA' });
+      window.localStorage.removeItem(PERSONA_STORAGE_KEY);
       return;
     }
 
+    dispatch({ type: 'CLEAR_USER_DATA' });
     let cancelled = false;
     (async () => {
       const [remote, drafts, trendRecords] = await Promise.all([

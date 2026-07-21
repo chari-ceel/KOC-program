@@ -173,3 +173,20 @@ def test_agent_chat_conversation_detail_route_returns_404(monkeypatch):
     response = client.get("/api/agent/conversations/missing")
 
     assert response.status_code == 404
+
+
+def test_agent_chat_conversation_delete_route_uses_logged_in_user(monkeypatch):
+    captured = {}
+
+    def fake_delete_conversation(**kwargs):
+        captured.update(kwargs)
+        return {"code": 200, "data": {"deleted": True, "conversation_id": kwargs["conversation_id"]}}
+
+    app.dependency_overrides[get_current_user] = lambda: AuthenticatedUser(user_id="session-user", username="tester")
+    monkeypatch.setattr(agent_chat_endpoint.service, "delete_conversation", fake_delete_conversation)
+
+    response = client.delete("/api/agent/conversations/conv_001")
+
+    assert response.status_code == 200
+    assert response.json()["data"]["deleted"] is True
+    assert captured == {"user_id": "session-user", "conversation_id": "conv_001"}

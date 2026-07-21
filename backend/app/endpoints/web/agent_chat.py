@@ -61,3 +61,12 @@ async def get_agent_chat_conversation(
     if not conversation:
         raise HTTPException(status_code=404, detail="Conversation not found")
     return conversation
+
+
+@router.delete("/conversations/{conversation_id}")
+async def delete_agent_chat_conversation(
+    conversation_id: str,
+    current_user: AuthenticatedUser | None = Depends(get_current_user),
+):
+    user_id = current_user.user_id if current_user else "demo-user"
+    return service.delete_conversation(user_id=user_id, conversation_id=conversation_id)

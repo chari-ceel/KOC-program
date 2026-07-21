@@ -27,6 +27,10 @@ class AuthProfileRequest(BaseModel):
     avatar: str | None = None
 
 
+class AuthSwitchRequest(BaseModel):
+    user_id: str
+
+
 def _set_session_cookie(response: Response, session_id: str) -> None:
     response.set_cookie(
         key=SESSION_COOKIE_NAME,
@@ -71,6 +75,17 @@ async def login(request_body: AuthCredentialRequest, response: Response):
         user, session_id = auth_service.login(request_body.username, request_body.password)
     except ValueError as error:
         return JSONResponse(status_code=401, content={"code": 401, "message": str(error)})
+
+    _set_session_cookie(response, session_id)
+    return {"code": 200, "data": {"user": user}}
+
+
+@router.post("/switch")
+async def switch_account(request_body: AuthSwitchRequest, response: Response):
+    try:
+        user, session_id = auth_service.switch_user(request_body.user_id)
+    except ValueError as error:
+        return JSONResponse(status_code=404, content={"code": 404, "message": str(error)})
 
     _set_session_cookie(response, session_id)
     return {"code": 200, "data": {"user": user}}

@@ -189,3 +189,11 @@ class MemoryCRUD:
         memory_db.agent_chat_conversations.delete_many({"user_id": user_id})
         memory_db.agent_chat_messages.delete_many({"user_id": user_id})
         memory_db.agent_module_memories.delete_many({"user_id": user_id})
+
+    def delete_agent_chat_conversation(self, user_id: str, conversation_id: str) -> bool:
+        result = memory_db.agent_chat_conversations.delete_one(
+            {"user_id": user_id, "conversation_id": conversation_id}
+        )
+        memory_db.agent_chat_messages.delete_many({"user_id": user_id, "conversation_id": conversation_id})
+        memory_db.agent_module_memories.delete_many({"user_id": user_id, "conversation_id": conversation_id})
+        return result.deleted_count > 0
