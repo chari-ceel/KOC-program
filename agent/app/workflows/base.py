@@ -30,6 +30,7 @@ class BaseWorkflow:
         )
         if response.status != "failed":
             response.metadata["modelRole"] = plan.worker_role
+            response.metadata["appliedSkills"] = self._applied_skills_for_request(role_request)
             response.metadata["webSearchDecision"] = "disabled"
             response.metadata["subAgentTrace"] = self.orchestrator.trace_metadata(
                 plan,
@@ -113,6 +114,7 @@ class BaseWorkflow:
 
         if retrieval_result is None:
             response.metadata["modelRole"] = plan.worker_role
+            response.metadata["appliedSkills"] = self._applied_skills_for_request(final_request)
             response.metadata["webSearchDecision"] = web_search_decision
             response.metadata["subAgentTrace"] = self.orchestrator.trace_metadata(plan, web_search_decision=web_search_decision, retrieval_reason=retrieval_reason)
             return response
@@ -123,6 +125,7 @@ class BaseWorkflow:
         ]
         response.metadata[metadata_key] = retrieval_result.source
         response.metadata["modelRole"] = plan.worker_role
+        response.metadata["appliedSkills"] = self._applied_skills_for_request(final_request)
         response.metadata["webSearchDecision"] = "used"
         response.metadata["subAgentTrace"] = self.orchestrator.trace_metadata(plan, web_search_decision="used", retrieval_source=retrieval_result.source, retrieval_reason=retrieval_reason)
         return response
@@ -264,11 +267,25 @@ class BaseWorkflow:
     def _prompt_for_request(self, request: AgentRunRequest) -> str | None:
         prompt_override = request.options.get("promptOverride")
         if isinstance(prompt_override, str) and prompt_override.strip():
-            return prompt_override
+            return self._prompt_with_skills(request, prompt_override)
         try:
-            return self.prompt_loader.load(request.task_type)
+            return self._prompt_with_skills(request, self.prompt_loader.load(request.task_type))
         except KeyError:
             return None
+
+    def _prompt_with_skills(self, request: AgentRunRequest, prompt: str | None) -> str | None:
+        skill_blocks = []
+        for skill_name, skill_content in self.prompt_loader.load_skills_for_task(request.task_type):
+            skill_blocks.append(f"## Applied Skill: {skill_name}\n\n{skill_content.strip()}")
+        if not skill_blocks:
+            return prompt
+        skills_prompt = "\n\n".join(skill_blocks)
+        if prompt and prompt.strip():
+            return f"{prompt.rstrip()}\n\n{skills_prompt}"
+        return skills_prompt
+
+    def _applied_skills_for_request(self, request: AgentRunRequest) -> list[str]:
+        return self.prompt_loader.skills_for_task(request.task_type)
 
     def _variables_for_request(self, request: AgentRunRequest) -> dict:
         return {

@@ -34,6 +34,8 @@ services:
       - WEB_SEARCH_PROVIDER=${WEB_SEARCH_PROVIDER:-}
       - WEB_SEARCH_API_KEY=${WEB_SEARCH_API_KEY:-}
       - WEB_SEARCH_TIMEOUT_MS=${WEB_SEARCH_TIMEOUT_MS:-8000}
+    volumes:
+      - ./prompts:/app/prompts:ro
     restart: unless-stopped
 
   backend:
@@ -54,6 +56,8 @@ services:
       - AGENT_RUNTIME_PROVIDER=${AGENT_RUNTIME_PROVIDER:-model}
       - AGENT_BASE_URL=http://agent:8010
       - CORS_ALLOW_ORIGINS=${CORS_ALLOW_ORIGINS:-http://localhost:3000,http://localhost:5000,http://localhost:8081,http://localhost:8928,http://127.0.0.1:3000,http://127.0.0.1:5000,http://127.0.0.1:8081,http://127.0.0.1:8928}
+    volumes:
+      - ./prompts:/prompts:ro
     depends_on:
       - mongo
       - agent

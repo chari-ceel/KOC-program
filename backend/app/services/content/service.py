@@ -190,7 +190,7 @@ class ContentService:
     def _format_content_text(self, data: Dict[str, Any]) -> str:
         reply = data.get("reply")
         if isinstance(reply, str) and reply.strip():
-            return reply.strip()
+            return self._strip_ai_template_wrappers(reply)
 
         draft = data.get("revisedDraft") or data.get("draft", {}) or {}
         lines = []
@@ -262,7 +262,15 @@ class ContentService:
             if line:
                 lines.append(line)
 
-        return "\n\n".join(lines) if lines else "暂无内容草稿结果。"
+        return self._strip_ai_template_wrappers("\n\n".join(lines)) if lines else "暂无内容草稿结果。"
+
+    def _strip_ai_template_wrappers(self, text: str) -> str:
+        cleaned = re.sub(r"[ \t]+", " ", text or "").strip()
+        if not cleaned:
+            return ""
+        cleaned = re.sub(r"^(以下是|下面是|这里是)(我)?(为你|帮你)?(生成|整理|准备)?(的)?(一版|一篇)?[^：:。\n]{0,16}[：:。]\s*", "", cleaned)
+        cleaned = re.sub(r"\s*(希望对你有帮助|如果你还需要[，,]?.*?可以继续优化|欢迎点赞收藏关注)[。!！]?\s*$", "", cleaned)
+        return cleaned.strip()
 
     def _build_complete_draft(self, data: Dict[str, Any]) -> Dict[str, Any] | None:
         draft = data.get("revisedDraft") or data.get("draft", {}) or {}
