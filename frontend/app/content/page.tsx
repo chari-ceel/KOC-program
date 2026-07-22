@@ -792,10 +792,6 @@ function ContentPageInner() {
   }, []);
 
   const drafts = state.drafts;
-  const isSavedDraft = useCallback((draftId?: string) => Boolean(draftId && drafts.some((draft) => draft.id === draftId)), [drafts]);
-  const openImageGuide = useCallback((draftId: string) => {
-    router.push(`/image-guide?draftId=${encodeURIComponent(draftId)}`);
-  }, [router]);
 
   const switchViewMode = useCallback((nextViewMode: ViewMode) => {
     setViewMode(nextViewMode);
@@ -2010,7 +2006,7 @@ function ContentPageInner() {
         {viewMode === 'drafts' ? (
         <section className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <div className="mx-auto mt-8 w-full max-w-[980px] shrink-0 text-center">
-            <h1 className="koc-title-font koc-gradient-title text-[30px] leading-tight">Hi，我是你的写作小猪梨</h1>
+              <h1 className="koc-title-font koc-gradient-title text-[30px] leading-tight">Hi，我是你的写作小猪梨</h1>
             <p className="koc-song-font mt-2 text-[22px] leading-tight text-[var(--foreground)]">我会结合你的人设与热门选题，帮你生成更有账号风格的小红书笔记</p>
             {activePersonaTitle && (
               <p className="mx-auto mt-3 inline-flex rounded-full border border-[var(--box-border)] bg-[rgba(255,255,255,0.72)] px-4 py-2 text-[14px] text-[var(--foreground)] shadow-[var(--box-shadow)]">
@@ -2056,7 +2052,7 @@ function ContentPageInner() {
           )}
           {isAgentLoading && (
             <div className="mx-auto mt-4 w-full max-w-[860px] shrink-0">
-              <AgentStatusMessage status={{ kind: 'running', message: '小猪梨灵感加载中...' }} />
+                      <AgentStatusMessage status={{ kind: 'running', message: '小猪梨灵感加载中...' }} />
             </div>
           )}
 
@@ -2100,14 +2096,6 @@ function ContentPageInner() {
                       title="删除草稿"
                     >
                       删除
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => openImageGuide(draft.id)}
-                      className="absolute bottom-3 left-3 rounded-full border border-[var(--box-border)] bg-[rgba(255,255,255,0.94)] px-3 py-1.5 text-[13px] font-semibold text-[var(--foreground)] shadow-[var(--box-shadow)] transition hover:bg-[rgba(255,255,255,0.82)]"
-                      title="打开图文指导"
-                    >
-                      图文指导
                     </button>
                   </div>
                 );
@@ -2180,15 +2168,6 @@ function ContentPageInner() {
                         refreshDisabled={isAgentLoading}
                         saving={isSaving}
                       />
-                      {message.draft && isSavedDraft(activeDraft?.id) && (
-                        <button
-                          type="button"
-                          onClick={() => activeDraft?.id && openImageGuide(activeDraft.id)}
-                          className="koc-heading-font rounded-full border border-[var(--box-border)] bg-[rgba(255,255,255,0.9)] px-4 py-2 text-[14px] text-[var(--foreground)] shadow-[var(--box-shadow)] transition hover:bg-white"
-                        >
-                          图文指导
-                        </button>
-                      )}
                     </div>
                   </div>
                 )}
@@ -2201,7 +2180,7 @@ function ContentPageInner() {
                 refreshDisabled={isAgentLoading}
               />
             )}
-            {isAgentLoading && <AgentStatusMessage status={{ kind: 'running', message: '小猪梨灵感加载中...' }} />}
+                {isAgentLoading && <AgentStatusMessage status={{ kind: 'running', message: '小猪梨灵感加载中...' }} />}
           </div>
           {showScrollDown && (
             <ScrollToBottomButton onClick={scrollChatToBottom} />

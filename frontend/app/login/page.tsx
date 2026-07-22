@@ -9,12 +9,7 @@ import PasswordField from '@/components/PasswordField';
 import AuthPanelShell from '@/components/AuthPanelShell';
 
 type AuthMode = 'login' | 'register';
-const AVATAR_OPTIONS = ['梨', '星', '花', '云', '光', '心'];
 const AVATAR_UPLOAD_MAX_BYTES = 200 * 1024;
-
-function normalizeAvatarInput(value: string) {
-  return Array.from(value.trim()).slice(0, 2).join('');
-}
 
 function isImageAvatar(value?: string) {
   return Boolean(value?.startsWith('data:image/'));
@@ -23,7 +18,11 @@ function isImageAvatar(value?: string) {
 function AvatarPreview({ value }: { value: string }) {
   return (
     <span className="koc-heading-font flex size-14 items-center justify-center overflow-hidden rounded-full border border-[#DE868F]/45 bg-[#fff3f5] text-[24px] text-[#DE868F] shadow-[var(--box-shadow)]">
-      {isImageAvatar(value) ? <Image src={value} alt="" width={56} height={56} unoptimized className="size-full object-cover" /> : value || '梨'}
+      {isImageAvatar(value) ? (
+        <Image src={value} alt="" width={56} height={56} unoptimized className="size-full object-cover" />
+      ) : (
+        <span className="block size-6 rounded-full bg-[#bfdbfe]" />
+      )}
     </span>
   );
 }
@@ -31,11 +30,11 @@ function AvatarPreview({ value }: { value: string }) {
 function LoginPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { login, register, closeAuthDialog, openRegisterSuccessDialog } = useAuth();
+  const { login, register, closeAuthDialog } = useAuth();
   const [mode, setMode] = useState<AuthMode>(searchParams.get('mode') === 'register' ? 'register' : 'login');
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
-  const [avatar, setAvatar] = useState('梨');
+  const [avatar, setAvatar] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -61,11 +60,7 @@ function LoginPageContent() {
         await login(payload);
       } else {
         await register(payload);
-        openRegisterSuccessDialog({
-          redirectTo: nextUrl,
-        });
         closeAuthDialog();
-        return;
       }
       router.replace(nextUrl);
     } catch (error) {
@@ -109,14 +104,8 @@ function LoginPageContent() {
         <form onSubmit={handleSubmit} className="mx-auto mt-10 max-w-[540px] space-y-6">
           {mode === 'register' && (
             <div className="rounded-[24px] border border-[#FFFFFF] bg-[rgba(255,255,255,0.78)] px-6 py-5 shadow-[var(--box-shadow)]">
-              <div className="mb-4 flex items-center gap-4">
+              <div className="flex items-center gap-4">
                 <AvatarPreview value={avatar} />
-                <input
-                  value={isImageAvatar(avatar) ? '' : avatar}
-                  onChange={(event) => setAvatar(normalizeAvatarInput(event.target.value) || '梨')}
-                  className="koc-input-font h-12 min-w-0 flex-1 rounded-full border border-[var(--box-border)] bg-white px-5 text-[16px] text-[var(--foreground)] outline-none"
-                  placeholder="自定义头像，如一个字或 emoji"
-                />
                 <label className="koc-heading-font flex h-12 shrink-0 cursor-pointer items-center rounded-full border border-[#888888] bg-white px-4 text-[14px] text-[var(--foreground)] shadow-[var(--box-shadow)] transition hover:bg-[#fff3f5]">
                   上传
                   <input
@@ -126,23 +115,6 @@ function LoginPageContent() {
                     onChange={(event) => handleAvatarUpload(event.target.files?.[0])}
                   />
                 </label>
-              </div>
-              <div className="grid grid-cols-6 gap-3">
-                {AVATAR_OPTIONS.map((option) => (
-                  <button
-                    key={option}
-                    type="button"
-                    onClick={() => setAvatar(option)}
-                    className={`koc-heading-font flex size-12 items-center justify-center rounded-full border text-[20px] transition ${
-                      avatar === option
-                        ? 'border-[#DE868F] bg-[#DE868F] text-white shadow-[var(--cta-shadow)]'
-                        : 'border-[var(--box-border)] bg-white text-[var(--foreground)] hover:bg-[#fff3f5]'
-                    }`}
-                    aria-label={`选择头像 ${option}`}
-                  >
-                    {option}
-                  </button>
-                ))}
               </div>
             </div>
           )}
@@ -227,7 +199,7 @@ function LoginPageContent() {
               setError('');
               setEmail('');
               setName('');
-              setAvatar('梨');
+              setAvatar('');
               setPassword('');
               setConfirmPassword('');
             }}

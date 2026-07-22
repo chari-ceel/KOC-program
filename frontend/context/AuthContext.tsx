@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { API_BASE, isRecord, readJsonResponse } from '@/lib/api';
 import { ANONYMOUS_PERSONA_GENERATED_STORAGE_KEY } from '@/lib/persona';
+import { clearAgentChatScopeData, setAgentChatAccountScope } from '@/lib/agent-chat-store';
 
 export interface AuthUser {
   id?: string;
@@ -62,6 +63,7 @@ interface AuthContextValue {
   refreshMe: () => Promise<AuthUser | null>;
   login: (payload: AuthCredentials) => Promise<AuthUser | null>;
   register: (payload: AuthCredentials) => Promise<AuthUser | null>;
+  switchKnownAccount: (accountId: string) => Promise<AuthUser | null>;
   logout: () => Promise<void>;
   updateProfile: (payload: AuthProfileUpdate) => Promise<AuthUser | null>;
   deleteAccount: () => Promise<void>;
@@ -131,12 +133,17 @@ function readUserFromResponse(payload: unknown) {
 }
 
 async function postAuth(endpoint: string, body?: unknown) {
-  const response = await fetch(`${API_BASE}${endpoint}`, {
-    method: 'POST',
-    headers: body ? { 'Content-Type': 'application/json' } : undefined,
-    credentials: 'include',
-    body: body ? JSON.stringify(body) : undefined,
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE}${endpoint}`, {
+      method: 'POST',
+      headers: body ? { 'Content-Type': 'application/json' } : undefined,
+      credentials: 'include',
+      body: body ? JSON.stringify(body) : undefined,
+    });
+  } catch {
+    throw new Error('无法连接后端服务，请确认 Docker 服务已启动后重试。');
+  }
   const payload = await readJsonResponse(response).catch((error) => {
     if (response.ok) return {};
     throw error;
@@ -153,12 +160,17 @@ async function postAuth(endpoint: string, body?: unknown) {
 }
 
 async function patchAuth(endpoint: string, body: unknown) {
-  const response = await fetch(`${API_BASE}${endpoint}`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-    body: JSON.stringify(body),
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE}${endpoint}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(body),
+    });
+  } catch {
+    throw new Error('无法连接后端服务，请确认 Docker 服务已启动后重试。');
+  }
   const payload = await readJsonResponse(response).catch((error) => {
     if (response.ok) return {};
     throw error;
@@ -175,10 +187,15 @@ async function patchAuth(endpoint: string, body: unknown) {
 }
 
 async function deleteAuth(endpoint: string) {
-  const response = await fetch(`${API_BASE}${endpoint}`, {
-    method: 'DELETE',
-    credentials: 'include',
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE}${endpoint}`, {
+      method: 'DELETE',
+      credentials: 'include',
+    });
+  } catch {
+    throw new Error('无法连接后端服务，请确认 Docker 服务已启动后重试。');
+  }
   const payload = await readJsonResponse(response).catch((error) => {
     if (response.ok) return {};
     throw error;
@@ -231,6 +248,7 @@ function upsertKnownAccount(accounts: KnownAccount[], user: AuthUser): KnownAcco
   const id = accountIdForUser(user);
   const username = accountUsernameForUser(user);
   if (!id || !username) return accounts;
+  const existing = accounts.find((account) => account.id === id || account.username === username);
 
   const nextAccount: KnownAccount = {
     id,
@@ -239,7 +257,11 @@ function upsertKnownAccount(accounts: KnownAccount[], user: AuthUser): KnownAcco
     avatar: user.avatar,
     lastUsedAt: new Date().toISOString(),
   };
-  const next = [nextAccount, ...accounts.filter((account) => account.id !== id && account.username !== username)].slice(0, 5);
+  const next = existing
+    ? [nextAccount, ...accounts.filter((account) => account.id !== id && account.username !== username)]
+    : accounts.length >= 5
+      ? accounts
+      : [nextAccount, ...accounts];
   writeKnownAccounts(next);
   return next;
 }
@@ -304,6 +326,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => window.clearTimeout(timer);
   }, [refreshMe]);
 
+  useEffect(() => {
+    if (status === 'loading') return;
+    setAgentChatAccountScope(user ? accountIdForUser(user) : null);
+  }, [status, user]);
+
   const login = useCallback(async (payload: AuthCredentials) => {
     const responsePayload = await postAuth('/api/auth/login', payload);
     const nextUser = readUserFromResponse(responsePayload) || (await refreshMe());
@@ -316,6 +343,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const register = useCallback(async (payload: AuthCredentials) => {
     const responsePayload = await postAuth('/api/auth/register', payload);
+    const nextUser = readUserFromResponse(responsePayload) || (await refreshMe());
+    clearAnonymousPersonaTrialFlag();
+    setUser(nextUser);
+    setStatus(nextUser ? 'authenticated' : 'anonymous');
+    rememberKnownAccount(nextUser);
+    return nextUser;
+  }, [refreshMe, rememberKnownAccount]);
+
+  const switchKnownAccount = useCallback(async (accountId: string) => {
+    const responsePayload = await postAuth('/api/auth/switch', { user_id: accountId });
     const nextUser = readUserFromResponse(responsePayload) || (await refreshMe());
     clearAnonymousPersonaTrialFlag();
     setUser(nextUser);
@@ -357,6 +394,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (currentUser) {
       const id = accountIdForUser(currentUser);
       if (id) {
+        clearAgentChatScopeData(id);
         setKnownAccounts((current) => {
           const next = current.filter((account) => account.id !== id);
           writeKnownAccounts(next);
@@ -426,6 +464,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       refreshMe,
       login,
       register,
+      switchKnownAccount,
       logout,
       updateProfile,
       deleteAccount,
@@ -454,6 +493,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       openRegisterSuccessDialog,
       refreshMe,
       register,
+      switchKnownAccount,
       setAuthDialogMode,
       status,
       registerSuccessDialog,

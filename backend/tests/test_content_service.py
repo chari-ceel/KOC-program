@@ -159,21 +159,48 @@ def test_format_content_text_normalizes_joined_punctuation() -> None:
         {
             "draft": {
                 "selectedTitle": "低成本自律。",
+                "titleOptions": ["低成本自律。", "普通人自律先别急。"],
                 "intro": "很多人不是不努力，而是一开始就把路径想复杂了。",
                 "body": ["第一步，先明确目标。", "第二步，把任务拆成每周能完成的小动作，"],
                 "ending": "如果你也经常想开始但总拖延，。",
                 "tags": ["自律。", "大学生，"],
+                "coverSuggestion": {"mainText": "自律先看这篇", "layout": "大字标题加桌面实拍。"},
+                "imageTextStructure": ["图1：封面。", "图2：步骤清单。"],
             }
         }
     )
 
     assert text == (
-        "推荐标题：低成本自律\n\n"
-        "引入：很多人不是不努力，而是一开始就把路径想复杂了。\n\n"
-        "正文内容：第一步，先明确目标\n第二步，把任务拆成每周能完成的小动作\n\n"
-        "结尾建议：如果你也经常想开始但总拖延\n\n"
-        "标签建议：自律，大学生"
+        "**推荐标题：**低成本自律\n\n"
+        "**备选标题：**普通人自律先别急\n\n"
+        "**封面建议：**封面文字：自律先看这篇；排版：大字标题加桌面实拍\n\n"
+        "**图片顺序：**图1：封面；图2：步骤清单\n\n"
+        "**正文开头：**很多人不是不努力，而是一开始就把路径想复杂了。\n\n"
+        "**正文内容：**\n第一步，先明确目标\n第二步，把任务拆成每周能完成的小动作\n\n"
+        "**结尾互动：**如果你也经常想开始但总拖延\n\n"
+        "**标签建议：**自律，大学生"
     )
+
+
+def test_format_content_text_prefers_full_draft_over_short_reply() -> None:
+    service = ContentService()
+
+    text = service._format_content_text(
+        {
+            "reply": "已帮你写好一版。",
+            "draft": {
+                "selectedTitle": "新手种草别只夸好用",
+                "intro": "别急着说它好用，先把真实使用场景讲清楚。",
+                "body": ["先说购买原因", "再讲使用前后的具体变化"],
+                "ending": "你种草时最想看哪类细节？",
+                "tags": ["种草方法", "经验分享"],
+            },
+        }
+    )
+
+    assert "**推荐标题：**新手种草别只夸好用" in text
+    assert "**正文内容：**\n先说购买原因\n再讲使用前后的具体变化" in text
+    assert text != "已帮你写好一版。"
 
 
 def test_format_content_text_strips_ai_template_wrappers() -> None:

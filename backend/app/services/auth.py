@@ -5,6 +5,7 @@ import hmac
 import os
 import secrets
 import uuid
+from base64 import b64decode
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any, Dict, Optional
@@ -90,6 +91,13 @@ class AuthService:
         public_user = self._public_user(user)
         return public_user, self.create_session_for_user(public_user)
 
+    def switch_user(self, user_id: str) -> tuple[Dict[str, Any], str]:
+        user = self.users.find_one({"user_id": user_id})
+        if not user:
+            raise ValueError("账号不存在")
+        public_user = self._public_user(user)
+        return public_user, self.create_session_for_user(public_user)
+
     def logout(self, session_id: str | None) -> None:
         if session_id:
             self.sessions.delete_one({"session_id": session_id})
@@ -172,12 +180,14 @@ class AuthService:
     def _normalize_avatar(self, avatar: str) -> str:
         normalized = (avatar or "").strip()
         if normalized.startswith("data:image/"):
-            if len(normalized) > 260_000:
+            try:
+                image_bytes = b64decode(normalized.split(",", 1)[1], validate=True)
+            except (IndexError, ValueError) as exc:
+                raise ValueError("头像图片格式不正确") from exc
+            if len(image_bytes) > 200 * 1024:
                 raise ValueError("头像图片不能超过 200KB")
             return normalized
-        if len(normalized) > 4:
-            raise ValueError("头像不能超过 4 个字符")
-        return normalized or "梨"
+        return ""
 
     def _hash_password(self, password: str) -> str:
         salt = secrets.token_bytes(16)
@@ -209,7 +219,7 @@ class AuthService:
             "userId": user["user_id"],
             "username": user["username"],
             "name": user.get("name", ""),
-            "avatar": user.get("avatar", "梨"),
+            "avatar": user.get("avatar", ""),
         }
 
 

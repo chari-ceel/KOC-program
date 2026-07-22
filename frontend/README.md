@@ -29,5 +29,8 @@ docker compose -f docker-compose.full.yml up --build -d
 
 ## 补充说明
 
-- 前端通过 `API_PROXY_TARGET=http://backend:8000` 访问后端。
+- 统一对话页不再使用假接口或前端伪造流程状态；登录用户的消息、阶段、摘要、完成状态、按钮和草稿标题都以后端 `/api/agent/chat`、`/api/agent/conversations` 返回为准。
+- `frontend/app/api/agent/[...path]/route.ts` 会把浏览器侧 `/api/agent/*` 请求真实转发到后端，并保留 cookie；该 route 只做代理和超时错误提示，不生成假 Agent 内容。
+- Docker 环境下前端通过 `API_PROXY_TARGET=http://backend:8000` 访问后端；本地临时直跑前端时默认转发到 `http://127.0.0.1:5001`。
+- 如果只打开 `http://localhost:3000`，必须确认后端 `http://127.0.0.1:5001/api/health` 正常，否则统一对话会显示请求失败。
 - 如果页面异常，先检查根目录 `docker-compose.full.yml` 对应的 `frontend`、`backend`、`agent`、`mongo` 服务状态，而不是先切回本地散跑。
