@@ -6,7 +6,7 @@ import { AuthProvider } from '@/context/AuthContext';
 
 export const metadata: Metadata = {
   title: '顶流养成计划',
-  description: 'KOC Agent 顶流养成计划',
+  description: '顶流小猪梨 顶流养成计划',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

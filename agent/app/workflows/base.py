@@ -32,6 +32,14 @@ class BaseWorkflow:
             response.metadata["modelRole"] = plan.worker_role
             response.metadata["appliedSkills"] = self._applied_skills_for_request(role_request)
             response.metadata["webSearchDecision"] = "disabled"
+            response.metadata["agentPlan"] = self.orchestrator.agent_plan_summary(
+                plan,
+                web_search_decision="disabled",
+            )
+            response.metadata["qualityChecks"] = self._quality_checks(
+                response,
+                source_status="not_required",
+            )
             response.metadata["subAgentTrace"] = self.orchestrator.trace_metadata(
                 plan,
                 web_search_decision="disabled",
@@ -78,6 +86,9 @@ class BaseWorkflow:
                             "language": request.options.get("language", "zh-CN"),
                             "debugAuth": request.options.get("debugAuth", {}),
                             "decisionReason": "forced_by_task_policy",
+                            "queries": self.orchestrator.deterministic_retrieval_queries(request),
+                            "freshnessDays": request.options.get("freshnessDays", 30),
+                            "sourcePreference": request.options.get("sourcePreference", "public_web"),
                         },
                         timeoutMs=request.options.get("webSearchTimeoutMs", 15000),
                     )
@@ -116,6 +127,15 @@ class BaseWorkflow:
             response.metadata["modelRole"] = plan.worker_role
             response.metadata["appliedSkills"] = self._applied_skills_for_request(final_request)
             response.metadata["webSearchDecision"] = web_search_decision
+            response.metadata["agentPlan"] = self.orchestrator.agent_plan_summary(
+                plan,
+                web_search_decision=web_search_decision,
+                retrieval_reason=retrieval_reason,
+            )
+            response.metadata["qualityChecks"] = self._quality_checks(
+                response,
+                source_status="not_required" if web_search_decision == "skipped_by_agent" else "not_used",
+            )
             response.metadata["subAgentTrace"] = self.orchestrator.trace_metadata(plan, web_search_decision=web_search_decision, retrieval_reason=retrieval_reason)
             return response
 
@@ -127,6 +147,16 @@ class BaseWorkflow:
         response.metadata["modelRole"] = plan.worker_role
         response.metadata["appliedSkills"] = self._applied_skills_for_request(final_request)
         response.metadata["webSearchDecision"] = "used"
+        response.metadata["agentPlan"] = self.orchestrator.agent_plan_summary(
+            plan,
+            web_search_decision="used",
+            retrieval_reason=retrieval_reason,
+        )
+        response.metadata["qualityChecks"] = self._quality_checks(
+            response,
+            source_status=retrieval_result.status,
+            source_count=len(retrieval_result.items),
+        )
         response.metadata["subAgentTrace"] = self.orchestrator.trace_metadata(plan, web_search_decision="used", retrieval_source=retrieval_result.source, retrieval_reason=retrieval_reason)
         return response
 
@@ -148,6 +178,18 @@ class BaseWorkflow:
             ),
             "debugAuth": request.options.get("debugAuth", {}),
         }
+        deterministic_queries = self.orchestrator.deterministic_retrieval_queries(request)
+        existing_queries = requested_filters.get("queries")
+        if not isinstance(existing_queries, list) or not existing_queries:
+            filters["queries"] = deterministic_queries or [retrieval_request.query]
+        filters["freshnessDays"] = requested_filters.get(
+            "freshnessDays",
+            request.options.get("freshnessDays", 30),
+        )
+        filters["sourcePreference"] = requested_filters.get(
+            "sourcePreference",
+            request.options.get("sourcePreference", "public_web"),
+        )
         limit = retrieval_request.limit or request.options.get("maxToolCalls", 3) or 3
         return retrieval_request.model_copy(
             update={
@@ -337,4 +379,33 @@ class BaseWorkflow:
         response.tool_calls = [call.model_dump(mode="json") for call in tool_calls]
         response.metadata["modelRole"] = self.orchestrator.plan(request).worker_role
         response.metadata["webSearchDecision"] = "failed"
+        plan = self.orchestrator.plan(request)
+        response.metadata["agentPlan"] = self.orchestrator.agent_plan_summary(
+            plan,
+            web_search_decision="failed",
+            retrieval_reason="web_search_failed",
+        )
+        response.metadata["qualityChecks"] = self._quality_checks(
+            response,
+            source_status="failed",
+        )
+        response.metadata["recovery"] = {
+            "action": "ask_user_or_retry",
+            "message": "未拿到可靠公开资料，本轮不会使用 mock 数据伪造来源。",
+        }
         return response
+
+    def _quality_checks(
+        self,
+        response: AgentRunResponse,
+        *,
+        source_status: str,
+        source_count: int = 0,
+    ) -> dict:
+        data = response.data if isinstance(response.data, dict) else {}
+        return {
+            "structuredOutput": "passed" if bool(data) else "empty",
+            "sourceCheck": source_status,
+            "sourceCount": source_count,
+            "toolCallCount": len(response.tool_calls or []),
+        }

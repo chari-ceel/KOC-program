@@ -1,5 +1,5 @@
 from app.core.config import Settings
-from app.schemas.tools import RetrievalToolRequest
+from app.schemas.tools import RetrievalItem, RetrievalToolRequest, RetrievalToolResult
 from app.tools.registry import ToolRegistry
 from app.tools.web_search import WebSearchTool
 
@@ -77,7 +77,7 @@ def test_debug_auth_key_is_not_written_to_tool_call() -> None:
     assert "secret-test-key" not in serialized
 
 
-def test_registry_returns_structured_error_for_reserved_source() -> None:
+def test_registry_returns_disabled_result_for_xhs_fetcher_by_default() -> None:
     registry = ToolRegistry(Settings())
 
     result, call = registry.search(
@@ -89,8 +89,45 @@ def test_registry_returns_structured_error_for_reserved_source() -> None:
 
     assert result.status == "failed"
     assert result.error is not None
-    assert result.error.code == "RESERVED_TOOL"
+    assert result.error.code == "DISABLED"
     assert call.status == "failed"
+
+
+def test_registry_aggregates_and_scores_multiple_queries() -> None:
+    class FakeSearchTool:
+        name = "web_search"
+
+        def search(self, request: RetrievalToolRequest) -> RetrievalToolResult:
+            return RetrievalToolResult(
+                source="web_search",
+                status="success",
+                items=[
+                    RetrievalItem(
+                        title=f"{request.query} 小红书笔记",
+                        url=f"https://example.com/{request.query}",
+                        summary="适合小红书图文选题、封面和标题参考。",
+                        metadata={"provider": "tavily"},
+                    )
+                ],
+            )
+
+    registry = ToolRegistry(Settings())
+    registry.web_search = FakeSearchTool()
+
+    result, calls = registry.search_with_fallback(
+        RetrievalToolRequest(
+            source="web_search",
+            query="小红书 修仙文",
+            limit=3,
+            filters={"queries": ["小红书 修仙文", "修仙文 爆款标题"]},
+        )
+    )
+
+    assert result.status == "success"
+    assert len(calls) == 2
+    assert len(result.items) == 2
+    assert "relevanceScore" in result.items[0].metadata
+    assert "xhsLikeSignal" in result.items[0].metadata
 
 
 def test_web_search_accepts_gemini_provider_without_rejecting(monkeypatch) -> None:

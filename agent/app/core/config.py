@@ -8,6 +8,7 @@ class Settings(BaseSettings):
     version: str = "0.1.0"
     agent_port: int = Field(default=8010, alias="AGENT_PORT")
     enable_web_search: bool = Field(default=True, alias="ENABLE_WEB_SEARCH")
+    enable_xhs_fetcher: bool = Field(default=False, alias="ENABLE_XHS_FETCHER")
     web_search_provider: str = Field(default="", alias="WEB_SEARCH_PROVIDER")
     web_search_api_key: str = Field(default="", alias="WEB_SEARCH_API_KEY")
     web_search_timeout_ms: int = Field(default=8000, alias="WEB_SEARCH_TIMEOUT_MS")

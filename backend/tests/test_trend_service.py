@@ -209,14 +209,96 @@ def test_format_trend_text_normalizes_joined_punctuation() -> None:
             },
             "hotTrends": [{"name": "低成本自律。", "reason": "用户更关注能马上照做的方法。"}],
             "audienceNeeds": [{"need": "考证规划：", "evidence": "很多人会问具体怎么安排时间。"}],
-            "topicOpportunities": [{"title": "大学生如何重启自律。", "angle": "从失败后怎么重新开始切入。"}],
+            "topicOpportunities": [
+                {"title": "大学生如何重启自律。", "angle": "从失败后怎么重新开始切入。"},
+                {"title": "考证时间怎么安排。", "angle": "用一张表拆出每天任务。"},
+                {"title": "低成本自律清单。", "angle": "从宿舍能做的小事开始。"},
+            ],
         }
     )
 
     assert text == (
-        "趋势维度：近一周 / 小红书 / 大学生成长。\n"
-        "趋势总结：时间管理内容在升温。\n"
-        "当前热点包括：低成本自律：用户更关注能马上照做的方法。\n"
-        "受众需求：考证规划：很多人会问具体怎么安排时间。\n"
-        "推荐选题：1. 大学生如何重启自律，角度：从失败后怎么重新开始切入。"
+        "**趋势维度：**近一周 / 小红书 / 大学生成长。\n"
+        "**趋势总结：**时间管理内容在升温。\n"
+        "**当前热点包括：**低成本自律：用户更关注能马上照做的方法。\n"
+        "**受众需求：**考证规划：很多人会问具体怎么安排时间。\n"
+        "**推荐选题：**\n"
+        "1. 大学生如何重启自律，角度：从失败后怎么重新开始切入\n"
+        "2. 考证时间怎么安排，角度：用一张表拆出每天任务\n"
+        "3. 低成本自律清单，角度：从宿舍能做的小事开始"
     )
+
+
+def test_format_trend_text_maps_internal_period_and_platform_values() -> None:
+    service = TrendService()
+
+    text = service._format_trend_text(
+        {
+            "trendSummary": {
+                "period": "7d",
+                "platform": "xiaohongshu",
+                "niche": "涨粉赛道",
+                "summary": "新手经验分享内容更容易被收藏。",
+            },
+        }
+    )
+
+    assert "7d" not in text
+    assert "xiaohongshu" not in text
+    assert "**趋势维度：**近七天 / 小红书 / 涨粉赛道。" in text
+
+
+def test_format_trend_text_prefers_structured_report_over_short_reply() -> None:
+    service = TrendService()
+
+    text = service._format_trend_text(
+        {
+            "reply": "已生成完整热门追踪。",
+            "trendSummary": {"niche": "涨粉赛道", "summary": "新手经验分享内容更容易被收藏。"},
+            "hotTrends": [{"name": "种草方法", "reason": "用户想看真实使用过程"}],
+            "audienceNeeds": [{"need": "快速判断值不值得买", "evidence": "评论区常问避雷点"}],
+            "topicOpportunities": [{"title": "新手种草别只夸好用", "angle": "从真实踩坑切入"}],
+        }
+    )
+
+    assert "**趋势总结：**新手经验分享内容更容易被收藏。" in text
+    assert "**当前热点包括：**种草方法：用户想看真实使用过程。" in text
+    assert text != "已生成完整热门追踪。"
+
+
+def test_sanitize_trend_copy_keeps_topics_in_graphic_text_scope() -> None:
+    service = TrendService()
+
+    text = service._format_trend_text(
+        {
+            "trendSummary": {"niche": "涨粉赛道", "summary": "适合做图文笔记。"},
+            "hotTrends": [{"name": "短视频脚本拆解", "reason": "用户想看口播脚本和视频分镜"}],
+            "audienceNeeds": [{"need": "拍摄成本低", "evidence": "希望不用复杂镜头"}],
+            "topicOpportunities": [{"title": "短视频脚本复盘", "angle": "用三段视频讲清楚"}],
+        }
+    )
+
+    assert "视频脚本" not in text
+    assert "短视频" not in text
+    assert "口播脚本" not in text
+    assert "分镜" not in text
+    assert "镜头" not in text
+    assert "图文笔记" in text
+
+
+def test_build_complete_analysis_uses_relevant_track_name() -> None:
+    service = TrendService()
+
+    payload = service._build_complete_analysis(
+        {
+            "originalUserPreference": "恋与深空沈星回卡面测评",
+            "trendSummary": {"niche": "智能趋势分析", "summary": "卡面测评和抽卡体验讨论升温。"},
+            "hotTrends": [{"name": "沈星回卡面细节", "reason": "玩家关注卡面氛围和剧情关联"}],
+            "audienceNeeds": [{"need": "想知道值不值得抽", "evidence": "评论常问抽卡建议"}],
+            "topicOpportunities": [{"title": "沈星回新卡到底值不值得抽", "angle": "从卡面细节和剧情体验切入"}],
+        }
+    )
+
+    assert payload is not None
+    assert payload["trackName"] != "智能趋势分析"
+    assert "恋与深空" in payload["trackName"] or "沈星回" in payload["trackName"]

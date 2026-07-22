@@ -20,7 +20,7 @@ export default function ScenarioHeader({
           <div
             className="koc-heading-font grid size-[64px] place-items-center rounded-[16px] border border-[var(--box-border)] bg-[#f6f7f9] text-[30px] text-[var(--foreground)] shadow-[var(--box-shadow)]"
           >
-            梨
+            黎
           </div>
           <div>
             <h1 className="koc-title-font koc-gradient-title text-[30px] leading-tight">{title}</h1>

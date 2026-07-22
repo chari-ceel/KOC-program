@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
@@ -28,6 +28,8 @@ class MemoryCRUD:
 
     def ensure_agent_chat_indexes(self) -> None:
         memory_db.agent_chat_conversations.create_index([("user_id", 1), ("conversation_id", 1)], unique=True)
+        memory_db.agent_chat_conversations.create_index([("user_id", 1), ("source_persona_record_id", 1)])
+        memory_db.agent_chat_conversations.create_index([("user_id", 1), ("parent_conversation_id", 1)])
         memory_db.agent_chat_messages.create_index([("user_id", 1), ("conversation_id", 1), ("created_at", 1)])
         memory_db.agent_chat_messages.create_index([("user_id", 1), ("conversation_id", 1), ("message_id", 1)], unique=True)
         memory_db.agent_module_memories.create_index([("user_id", 1), ("conversation_id", 1), ("memory_id", 1)], unique=True)
@@ -82,6 +84,8 @@ class MemoryCRUD:
         content: str,
         step: str,
         message_id: Optional[str] = None,
+        question_blocks: Optional[List[Dict[str, Any]]] = None,
+        copy_payload: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         now = datetime.utcnow()
         doc = {
@@ -93,8 +97,32 @@ class MemoryCRUD:
             "step": step,
             "created_at": now,
         }
+        if question_blocks:
+            doc["question_blocks"] = question_blocks
+        if copy_payload:
+            doc["copy_payload"] = copy_payload
         memory_db.agent_chat_messages.insert_one(doc)
         return {key: value for key, value in doc.items() if key != "_id"}
+
+    def update_agent_chat_message(
+        self,
+        user_id: str,
+        conversation_id: str,
+        message_id: str,
+        payload: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        updates = {key: value for key, value in payload.items() if key in {"question_blocks", "copy_payload"}}
+        if not updates:
+            return {}
+        memory_db.agent_chat_messages.update_one(
+            {"user_id": user_id, "conversation_id": conversation_id, "message_id": message_id},
+            {"$set": updates},
+        )
+        doc = memory_db.agent_chat_messages.find_one(
+            {"user_id": user_id, "conversation_id": conversation_id, "message_id": message_id},
+            {"_id": 0},
+        )
+        return doc or {}
 
     def list_agent_chat_messages(self, user_id: str, conversation_id: str, limit: int = 80) -> List[Dict[str, Any]]:
         docs = list(
@@ -197,3 +225,72 @@ class MemoryCRUD:
         memory_db.agent_chat_messages.delete_many({"user_id": user_id, "conversation_id": conversation_id})
         memory_db.agent_module_memories.delete_many({"user_id": user_id, "conversation_id": conversation_id})
         return result.deleted_count > 0
+
+    def delete_empty_agent_chat_conversations(self, user_id: str) -> int:
+        legacy_cutoff = datetime.utcnow() - timedelta(minutes=5)
+        pending_cutoff = datetime.utcnow() - timedelta(minutes=30)
+        candidates = list(
+            memory_db.agent_chat_conversations.find(
+                {
+                    "user_id": user_id,
+                    "title": {"$in": ["新建对话", "新的创作对话"]},
+                    "active_persona_memory_id": None,
+                    "active_trending_memory_id": None,
+                    "active_content_memory_id": None,
+                },
+                {"conversation_id": 1, "create_status": 1, "created_at": 1},
+            )
+        )
+        deleted_count = 0
+        for conversation in candidates:
+            conversation_id = conversation.get("conversation_id")
+            if not isinstance(conversation_id, str) or not conversation_id:
+                continue
+            create_status = conversation.get("create_status")
+            created_at = conversation.get("created_at")
+            is_failed_create = (
+                create_status in {"creating", "questions_failed"}
+                and isinstance(created_at, datetime)
+                and created_at < legacy_cutoff
+            )
+            is_stale_pending = (
+                create_status == "questions_pending"
+                and isinstance(created_at, datetime)
+                and created_at < pending_cutoff
+            )
+            is_legacy_empty = (
+                create_status is None
+                and isinstance(created_at, datetime)
+                and created_at < legacy_cutoff
+            )
+            if not is_failed_create and not is_stale_pending and not is_legacy_empty:
+                continue
+            has_user_message = memory_db.agent_chat_messages.count_documents(
+                {"user_id": user_id, "conversation_id": conversation_id, "role": "user"},
+                limit=1,
+            )
+            has_module_memory = memory_db.agent_module_memories.count_documents(
+                {"user_id": user_id, "conversation_id": conversation_id},
+                limit=1,
+            )
+            if has_user_message or has_module_memory:
+                continue
+            if self.delete_agent_chat_conversation(user_id, conversation_id):
+                deleted_count += 1
+        return deleted_count
+
+    def delete_agent_chat_conversations_by_persona_record(self, user_id: str, persona_record_id: str) -> int:
+        conversations = list(
+            memory_db.agent_chat_conversations.find(
+                {"user_id": user_id, "source_persona_record_id": persona_record_id},
+                {"conversation_id": 1},
+            )
+        )
+        deleted_count = 0
+        for conversation in conversations:
+            conversation_id = conversation.get("conversation_id")
+            if not isinstance(conversation_id, str) or not conversation_id:
+                continue
+            if self.delete_agent_chat_conversation(user_id, conversation_id):
+                deleted_count += 1
+        return deleted_count

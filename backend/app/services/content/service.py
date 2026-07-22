@@ -188,19 +188,48 @@ class ContentService:
         return value.strip()[:XHS_TITLE_MAX_CHARS].strip()
 
     def _format_content_text(self, data: Dict[str, Any]) -> str:
-        reply = data.get("reply")
-        if isinstance(reply, str) and reply.strip():
-            return self._strip_ai_template_wrappers(reply)
-
         draft = data.get("revisedDraft") or data.get("draft", {}) or {}
         lines = []
-        if selected_title := draft.get("selectedTitle"):
-            line = self._format_labeled_text_line("推荐标题：", self._strip_terminal_punctuation(selected_title))
+        selected_title_text = self._strip_terminal_punctuation(draft.get("selectedTitle") or draft.get("title"))
+        if selected_title := draft.get("selectedTitle") or draft.get("title"):
+            line = self._format_labeled_text_line("**推荐标题：**", selected_title_text)
             if line:
                 lines.append(line)
+        title_options = draft.get("titleOptions")
+        if isinstance(title_options, list):
+            normalized_titles = [
+                self._strip_terminal_punctuation(item)
+                for item in title_options
+                if isinstance(item, str) and item.strip()
+            ]
+            normalized_titles = [item for item in normalized_titles if item and item != selected_title_text]
+            if normalized_titles:
+                line = self._format_labeled_text_line("**备选标题：**", " / ".join(normalized_titles[:4]))
+                if line:
+                    lines.append(line)
+        cover = draft.get("coverSuggestion") or {}
+        if cover:
+            cover_text = []
+            if cover.get("mainText"):
+                cover_text.append(f"封面文字：{self._normalize_segment_text(cover['mainText'])}")
+            if cover.get("layout"):
+                cover_text.append(f"排版：{self._normalize_segment_text(cover['layout'])}")
+            if cover.get("visualStyle"):
+                cover_text.append(f"风格：{self._normalize_segment_text(cover['visualStyle'])}")
+            if cover_text:
+                line = self._format_labeled_text_line("**封面建议：**", "；".join(cover_text))
+                if line:
+                    lines.append(line)
+
+        image_structure = draft.get("imageTextStructure")
+        if isinstance(image_structure, list) and image_structure:
+            line = self._format_labeled_text_line("**图片顺序：**", "；".join(self._normalize_joined_segments(image_structure)))
+            if line:
+                lines.append(line)
+
         intro = draft.get("intro") or draft.get("hook")
         if intro:
-            line = self._format_labeled_text_line("引入：", intro)
+            line = self._format_labeled_text_line("**正文开头：**", intro)
             if line:
                 lines.append(line)
         if body := draft.get("body"):
@@ -209,60 +238,28 @@ class ContentService:
                 body_text = "\n".join(body_parts)
             else:
                 body_text = self._normalize_inline_text(body)
-            line = f"正文内容：{body_text}" if body_text else ""
+            line = f"**正文内容：**\n{body_text}" if body_text else ""
             if line:
                 lines.append(line)
         if ending := draft.get("ending"):
             ending_text = self._strip_terminal_punctuation(self._normalize_inline_text(ending))
-            line = self._format_labeled_text_line("结尾建议：", ending_text)
+            line = self._format_labeled_text_line("**结尾互动：**", ending_text)
             if line:
                 lines.append(line)
         if tags := draft.get("tags"):
             if isinstance(tags, list):
-                line = self._format_labeled_text_line("标签建议：", "，".join(self._normalize_joined_segments(tags)))
+                line = self._format_labeled_text_line("**标签建议：**", "，".join(self._normalize_joined_segments(tags)))
             else:
-                line = self._format_labeled_text_line("标签建议：", self._normalize_segment_text(tags))
+                line = self._format_labeled_text_line("**标签建议：**", self._normalize_segment_text(tags))
             if line:
                 lines.append(line)
 
-        cover = draft.get("coverSuggestion") or {}
-        if cover:
-            cover_text = []
-            if cover.get("mainText"):
-                cover_text.append(f"主文案：{self._normalize_segment_text(cover['mainText'])}")
-            if cover.get("layout"):
-                cover_text.append(f"布局：{self._normalize_segment_text(cover['layout'])}")
-            if cover.get("visualStyle"):
-                cover_text.append(f"画面风格：{self._normalize_segment_text(cover['visualStyle'])}")
-            if cover_text:
-                line = self._format_labeled_text_line("封面建议：", "；".join(cover_text))
-                if line:
-                    lines.append(line)
-
-        video = draft.get("videoSuggestion") or {}
-        if video:
-            video_text = []
-            if video.get("opening"):
-                video_text.append(f"开场：{self._normalize_segment_text(video['opening'])}")
-            if shots := video.get("shots"):
-                if isinstance(shots, list):
-                    normalized_shots = self._normalize_joined_segments(shots)
-                    if normalized_shots:
-                        video_text.append(f"镜头建议：{'，'.join(normalized_shots)}")
-            if video.get("note"):
-                video_text.append(f"说明：{self._normalize_segment_text(video['note'])}")
-            if video_text:
-                line = self._format_labeled_text_line("视频建议：", "；".join(video_text))
-                if line:
-                    lines.append(line)
-
-        image_structure = draft.get("imageTextStructure")
-        if isinstance(image_structure, list) and image_structure:
-            line = self._format_labeled_text_line("图文结构：", "；".join(self._normalize_joined_segments(image_structure)))
-            if line:
-                lines.append(line)
-
-        return self._strip_ai_template_wrappers("\n\n".join(lines)) if lines else "暂无内容草稿结果。"
+        if lines:
+            return self._strip_ai_template_wrappers("\n\n".join(lines))
+        reply = data.get("reply")
+        if isinstance(reply, str) and reply.strip():
+            return self._strip_ai_template_wrappers(reply)
+        return "暂无内容草稿结果。"
 
     def _strip_ai_template_wrappers(self, text: str) -> str:
         cleaned = re.sub(r"[ \t]+", " ", text or "").strip()
@@ -531,11 +528,11 @@ class ContentService:
         return "\n".join(
             [
                 "这是内容撰写初始页的首条业务输入。",
-                "身份边界：小猪梨只是 Agent 助手昵称，不是用户的人设、账号名或内容主角；用户的具体人设只以 context.savedPersona 为准。",
+                "身份边界：顶流小猪梨只是 Agent 助手昵称，不是用户的人设、账号名或内容主角；用户的具体人设只以 context.savedPersona 为准。",
                 "请把用户原始输入直接理解为本轮要写的主题、口吻要求或写作方向，不要先停留在讨论态，也不要只给思路。",
                 "请直接输出一篇可展示、可保存、能直接改用的小红书图文笔记草稿，重点给标题备选、封面文字、正文第一句、正文、图片顺序、结尾互动、标签和 cardPreview。",
                 "标题备选和选中标题都必须控制在 20 个中文字符以内，符合小红书标题长度限制。",
-                "表达要像真实小红书图文笔记，少用运营术语和报告腔；视频建议只作为兼容字段简单填写。",
+                "表达要像真实小红书图文笔记，少用运营术语和报告腔；不要生成视频脚本、分镜或视频建议。",
                 f"主题：{raw_topic}",
                 f"用户原始输入：{raw_instruction}",
             ]

@@ -42,8 +42,9 @@ class PersonaCRUD:
             "is_favorited": False,
             "created_at": now,
             "updated_at": now,
-            "expires_at": now + timedelta(days=7),
         }
+        if collection_name != "personas":
+            doc["expires_at"] = now + timedelta(days=7)
         result = collection.insert_one(doc)
         doc["_id"] = result.inserted_id
         print(f"[PersonaCRUD] saved persona record for user_id={user_id} into {collection_name}")
@@ -60,11 +61,7 @@ class PersonaCRUD:
     def get_persona_history(self, user_id: str, days: int = 7, limit: int = 50) -> List[Dict[str, Any]]:
         collection = persona_db["personas"]
         self._ensure_indexes(collection)
-        cutoff = datetime.utcnow() - timedelta(days=days)
-        docs = collection.find({
-            "user_id": user_id,
-            "created_at": {"$gte": cutoff},
-        }).sort("created_at", -1).limit(limit)
+        docs = collection.find({"user_id": user_id}).sort("created_at", -1).limit(limit)
         return [self._serialize_record(doc) for doc in docs]
 
     def get_favorite_personas(self, user_id: str, limit: int = 100) -> List[Dict[str, Any]]:

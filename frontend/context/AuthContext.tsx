@@ -329,7 +329,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (status === 'loading') return;
     setAgentChatAccountScope(user ? accountIdForUser(user) : null);
-  }, [status, user?.id, user?.username, user?.email]);
+  }, [status, user]);
 
   const login = useCallback(async (payload: AuthCredentials) => {
     const responsePayload = await postAuth('/api/auth/login', payload);
