@@ -254,8 +254,8 @@ export default function Sidebar() {
       if (activeConversationId) {
         window.dispatchEvent(new CustomEvent(AGENT_CHAT_SELECT_CONVERSATION_EVENT, { detail: { localId: activeConversationId } }));
       }
-      if (pathname !== '/') {
-        window.location.href = '/';
+      if (pathname !== '/chat') {
+        window.location.href = '/chat';
       }
       return;
     }
@@ -263,15 +263,15 @@ export default function Sidebar() {
       openUnlockDialog({
         title: '登录后新建更多角色对话',
         descriptionLines: ['游客模式只能免费生成一次初版人设。', '新建更多角色、继续追问、热门追踪和内容撰写需要登录。'],
-        redirectTo: '/',
-        closeRedirectTo: '/',
+        redirectTo: '/chat',
+        closeRedirectTo: '/chat',
       });
       return;
     }
     const conversation = createAndStoreConversation();
     window.dispatchEvent(new CustomEvent(AGENT_CHAT_CREATE_CONVERSATION_EVENT, { detail: { localId: conversation.local_id } }));
-    if (pathname !== '/') {
-      window.location.href = '/';
+    if (pathname !== '/chat') {
+      window.location.href = '/chat';
     }
   };
 
@@ -280,8 +280,8 @@ export default function Sidebar() {
     setActiveConversationId(localId);
     writeActiveConversationId(localId);
     window.dispatchEvent(new CustomEvent(AGENT_CHAT_SELECT_CONVERSATION_EVENT, { detail: { localId } }));
-    if (pathname !== '/') {
-      window.location.href = '/';
+    if (pathname !== '/chat') {
+      window.location.href = '/chat';
     }
   };
 
@@ -358,8 +358,8 @@ export default function Sidebar() {
     try {
       await switchKnownAccount(accountId);
       setIsUserMenuOpen(false);
-      if (pathname !== '/') {
-        window.location.href = '/';
+      if (pathname !== '/chat') {
+        window.location.href = '/chat';
       }
     } catch (error) {
       setAccountNotice(error instanceof Error ? error.message : '切换账号失败');

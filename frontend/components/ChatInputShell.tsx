@@ -12,11 +12,11 @@ export default function ChatInputShell({
   compact?: boolean;
 }) {
   const widthClassName = compact
-    ? 'w-full max-w-[980px]'
-    : 'mx-auto w-full max-w-[980px] shrink-0';
+    ? 'w-full max-w-[960px]'
+    : 'mx-auto w-full max-w-[960px] shrink-0';
 
   return (
-    <div className={`koc-safe-shadow-area ${widthClassName} ${compact ? '' : 'mt-8'} pb-2 ${className}`.trim()}>
+    <div className={`koc-safe-shadow-area ${widthClassName} ${compact ? '' : 'mt-4'} pb-1.5 ${className}`.trim()}>
       {children}
     </div>
   );

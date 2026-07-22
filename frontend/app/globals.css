@@ -193,6 +193,433 @@ input[type="password"]::-ms-clear {
   animation: koc-loading-spin 0.9s linear infinite;
 }
 
+.koc-rise-in {
+  animation: koc-rise-in 0.72s cubic-bezier(0.2, 0.84, 0.22, 1) both;
+}
+
+.koc-rise-delay-1 {
+  animation-delay: 0.18s;
+}
+
+.koc-rise-delay-2 {
+  animation-delay: 0.34s;
+}
+
+.koc-scroll-reveal {
+  opacity: 0;
+  transform: translate3d(0, var(--koc-reveal-y, 30px), 0);
+  transition:
+    opacity 0.68s cubic-bezier(0.2, 0.84, 0.22, 1),
+    transform 0.68s cubic-bezier(0.2, 0.84, 0.22, 1);
+  transition-delay: var(--koc-reveal-delay, 0ms);
+  will-change: opacity, transform;
+}
+
+.koc-scroll-reveal.is-visible {
+  opacity: 1;
+  transform: translate3d(0, 0, 0);
+}
+
+.koc-home-bubble {
+  animation: koc-home-bubble 5.8s ease-in-out infinite;
+}
+
+.koc-home-bubble-2 {
+  animation-delay: 0.9s;
+}
+
+.koc-home-glitter {
+  position: absolute;
+  display: block;
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 1) 38%, rgba(203, 225, 255, 0.98) 58%, rgba(255, 255, 255, 0) 100%);
+  box-shadow: 0 0 12px rgba(191, 219, 254, 0.56), 0 0 22px rgba(168, 139, 250, 0.28);
+  mix-blend-mode: screen;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: koc-home-glitter-fall 5.7s linear infinite;
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+
+.koc-brand-intro {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  overflow: hidden;
+  pointer-events: none;
+  isolation: isolate;
+  background:
+    radial-gradient(ellipse 72vw 42vw at 88% 28%, rgba(168, 139, 250, 0.08), transparent 58%),
+    #02030a;
+  animation: koc-brand-intro-exit 5.8s cubic-bezier(0.2, 0.84, 0.22, 1) forwards;
+}
+
+.koc-brand-intro::before {
+  content: "";
+  position: absolute;
+  inset: -18%;
+  z-index: -1;
+  background:
+    radial-gradient(ellipse 58vw 30vw at 78% 34%, rgba(186, 220, 255, 0.34), transparent 60%),
+    radial-gradient(ellipse 72vw 38vw at 62% 52%, rgba(167, 139, 250, 0.22), transparent 66%),
+    linear-gradient(110deg, rgba(255, 255, 255, 0), rgba(186, 220, 255, 0.1) 48%, rgba(255, 255, 255, 0));
+  filter: blur(18px);
+  opacity: 0;
+  transform: translate3d(18vw, -5vh, 0) rotate(-7deg);
+  animation: koc-brand-intro-brighten 5.3s cubic-bezier(0.2, 0.84, 0.22, 1) forwards;
+}
+
+.koc-brand-intro-glow {
+  position: absolute;
+  inset: -10%;
+  background:
+    linear-gradient(104deg, transparent 18%, rgba(125, 185, 255, 0.06) 48%, rgba(184, 168, 255, 0.18) 68%, transparent 86%),
+    radial-gradient(ellipse 48vw 24vw at 78% 42%, rgba(219, 234, 254, 0.24), transparent 68%);
+  mix-blend-mode: screen;
+  opacity: 0;
+  transform: translate3d(18vw, -4vh, 0) rotate(-8deg);
+  animation: koc-brand-intro-glow 4.8s cubic-bezier(0.2, 0.84, 0.22, 1) forwards;
+}
+
+.koc-brand-intro-ribbon {
+  position: absolute;
+  inset: -10% -8%;
+  width: 116%;
+  height: 116%;
+  opacity: 0;
+  mix-blend-mode: screen;
+  transform: translate3d(18vw, -3vh, 0) rotate(-4deg) scale(1.04);
+  transform-origin: 76% 42%;
+  animation: koc-brand-intro-ribbon-sweep 4.9s cubic-bezier(0.2, 0.84, 0.22, 1) forwards;
+}
+
+.koc-brand-intro-ribbon-lines path {
+  fill: none;
+  stroke: url(#kocIntroRibbonGradient);
+  stroke-linecap: round;
+  stroke-dasharray: 980 1480;
+  stroke-dashoffset: 1280;
+  animation: koc-brand-intro-ribbon-draw 4.8s cubic-bezier(0.2, 0.84, 0.22, 1) forwards;
+}
+
+.koc-brand-intro-ribbon-lines path:nth-child(1) {
+  stroke-width: 58;
+  opacity: 0.58;
+}
+
+.koc-brand-intro-ribbon-lines path:nth-child(2) {
+  stroke-width: 34;
+  opacity: 0.5;
+  animation-delay: 0.1s;
+}
+
+.koc-brand-intro-ribbon-lines path:nth-child(3) {
+  stroke-width: 22;
+  opacity: 0.72;
+  animation-delay: 0.18s;
+}
+
+.koc-brand-intro-ribbon-lines path:nth-child(4) {
+  stroke-width: 18;
+  opacity: 0.42;
+  animation-delay: 0.28s;
+}
+
+.koc-brand-intro-ribbon-lines path:nth-child(5) {
+  stroke-width: 12;
+  opacity: 0.58;
+  animation-delay: 0.36s;
+}
+
+.koc-brand-intro-particles {
+  position: absolute;
+  inset: 0;
+  mix-blend-mode: screen;
+  filter: drop-shadow(0 0 16px rgba(186, 220, 255, 0.5));
+}
+
+.koc-brand-intro-particle {
+  position: absolute;
+  display: block;
+  border-radius: 999px;
+  background:
+    radial-gradient(circle, rgba(255, 255, 255, 0.98) 0 18%, rgba(203, 225, 255, 0.9) 28%, rgba(167, 139, 250, 0.36) 54%, transparent 74%);
+  box-shadow:
+    0 0 10px rgba(219, 234, 254, 0.82),
+    0 0 22px rgba(167, 139, 250, 0.38);
+  transform: translate3d(24vw, -5vh, 0) scale(0.45);
+  animation-name: koc-brand-intro-particle;
+  animation-timing-function: cubic-bezier(0.2, 0.84, 0.22, 1);
+  animation-fill-mode: both;
+  will-change: transform, opacity;
+}
+
+.koc-brand-intro-particle-coarse {
+  z-index: 1;
+  background:
+    radial-gradient(circle, rgba(255, 255, 255, 1) 0 12%, rgba(219, 234, 254, 0.96) 24%, rgba(184, 168, 255, 0.5) 56%, transparent 76%);
+  box-shadow:
+    0 0 14px rgba(219, 234, 254, 0.92),
+    0 0 32px rgba(167, 139, 250, 0.46),
+    0 0 54px rgba(96, 165, 250, 0.18);
+  filter: blur(0.15px);
+}
+
+.koc-brand-intro-particle-fine {
+  z-index: 2;
+  background:
+    radial-gradient(circle, rgba(255, 255, 255, 0.98) 0 18%, rgba(203, 225, 255, 0.82) 36%, rgba(167, 139, 250, 0.26) 58%, transparent 78%);
+  box-shadow:
+    0 0 8px rgba(219, 234, 254, 0.72),
+    0 0 16px rgba(167, 139, 250, 0.3);
+}
+
+.koc-brand-intro-logo {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  display: grid;
+  place-items: center;
+  width: min(86vw, 980px);
+  min-height: 180px;
+  transform: translate3d(-50%, -48%, 0);
+  opacity: 0;
+  animation: koc-brand-intro-logo 4.2s cubic-bezier(0.2, 0.84, 0.22, 1) 1.08s forwards;
+}
+
+.koc-brand-intro-logo::after {
+  content: "";
+  position: absolute;
+  inset: 30% 8%;
+  background:
+    radial-gradient(circle at 12% 52%, rgba(255, 255, 255, 0.88), transparent 2.5%),
+    radial-gradient(circle at 28% 42%, rgba(203, 225, 255, 0.76), transparent 2.2%),
+    radial-gradient(circle at 72% 58%, rgba(255, 255, 255, 0.72), transparent 2%),
+    radial-gradient(circle at 84% 38%, rgba(186, 220, 255, 0.86), transparent 2.4%);
+  filter: blur(0.2px) drop-shadow(0 0 10px rgba(203, 225, 255, 0.66));
+  opacity: 0;
+  animation: koc-brand-intro-logo-sparks 2.8s ease-out 1.72s forwards;
+}
+
+.koc-brand-intro-logo-ribbon {
+  position: absolute;
+  left: 8%;
+  right: 6%;
+  top: 50%;
+  height: clamp(28px, 5vw, 58px);
+  border-radius: 999px;
+  background:
+    linear-gradient(92deg, transparent 0%, rgba(186, 220, 255, 0.18) 18%, rgba(191, 184, 255, 0.66) 48%, rgba(234, 244, 255, 0.32) 72%, transparent 100%);
+  filter: blur(8px);
+  opacity: 0;
+  transform: translate3d(28vw, -50%, 0) rotate(-7deg) scaleX(0.38);
+  animation: koc-brand-intro-logo-ribbon 3.3s cubic-bezier(0.2, 0.84, 0.22, 1) 1.24s forwards;
+}
+
+.koc-brand-intro-logo-text {
+  position: relative;
+  z-index: 1;
+  color: #f8fbff;
+  font-size: clamp(42px, 8.4vw, 124px);
+  line-height: 1;
+  letter-spacing: 0;
+  white-space: nowrap;
+  text-shadow:
+    0 0 2px rgba(255, 255, 255, 0.9),
+    0 0 24px rgba(186, 220, 255, 0.34),
+    0 0 52px rgba(167, 139, 250, 0.22);
+}
+
+.koc-robot-mascot {
+  overflow: visible;
+  cursor: pointer;
+}
+
+.koc-robot-pose {
+  animation: koc-home-float 5.8s ease-in-out infinite;
+  transform-box: fill-box;
+  transform-origin: 50% 82%;
+  transition: transform 0.38s cubic-bezier(0.2, 0.84, 0.22, 1);
+}
+
+.koc-robot-head,
+.koc-robot-body,
+.koc-robot-arm,
+.koc-robot-hop-arm,
+.koc-robot-hop-foreground-arm,
+.koc-robot-leg,
+.koc-robot-shadow {
+  transform-box: fill-box;
+  transition:
+    opacity 0.24s ease,
+    transform 0.42s cubic-bezier(0.2, 0.84, 0.22, 1);
+}
+
+.koc-robot-head {
+  transform-origin: center bottom;
+}
+
+.koc-robot-left-arm {
+  transform-origin: 75% 12%;
+}
+
+.koc-robot-right-arm {
+  transform-origin: 25% 12%;
+}
+
+.koc-robot-left-leg {
+  transform-origin: 70% 0%;
+}
+
+.koc-robot-right-leg {
+  transform-origin: 30% 0%;
+}
+
+.koc-robot-action-hop .koc-robot-pose {
+  animation: koc-robot-hop 0.66s cubic-bezier(0.2, 0.84, 0.22, 1) both;
+}
+
+.koc-robot-action-hop .koc-robot-left-arm {
+  opacity: 0;
+}
+
+.koc-robot-action-hop .koc-robot-right-arm {
+  opacity: 0;
+}
+
+.koc-robot-action-hop .koc-robot-left-leg {
+  transform: translate3d(-24px, -2px, 0) rotate(-38deg);
+}
+
+.koc-robot-action-hop .koc-robot-right-leg {
+  transform: translate3d(24px, -2px, 0) rotate(38deg);
+}
+
+.koc-robot-action-hop .koc-robot-shadow {
+  opacity: 0.1;
+  transform: scaleX(0.82);
+}
+
+.koc-robot-hop-arm {
+  opacity: 0;
+}
+
+.koc-robot-hop-foreground-arm {
+  opacity: 0;
+}
+
+.koc-robot-action-hop .koc-robot-hop-arm {
+  opacity: 1;
+  transform: translate3d(0, -8px, 0);
+}
+
+.koc-robot-action-hop .koc-robot-hop-foreground-arm {
+  opacity: 1;
+  transform: translate3d(0, -12px, 0);
+}
+
+.koc-robot-action-hop .koc-robot-hop-foreground-limb {
+  opacity: 0;
+}
+
+.koc-robot-action-sit .koc-robot-pose {
+  animation: none;
+  transform: translate3d(0, 13px, 0) scale(1.02, 0.98);
+}
+
+.koc-robot-action-sit .koc-robot-body {
+  transform: translate3d(0, 7px, 0) scaleY(0.9);
+}
+
+.koc-robot-action-sit .koc-robot-left-leg {
+  transform: translate3d(-8px, 4px, 0) rotate(-20deg);
+}
+
+.koc-robot-action-sit .koc-robot-right-leg {
+  transform: translate3d(8px, 4px, 0) rotate(20deg);
+}
+
+.koc-robot-action-sit .koc-robot-shadow {
+  transform: scaleX(1.16);
+  opacity: 0.22;
+}
+
+.koc-robot-action-peace .koc-robot-pose {
+  animation: none;
+  transform: translate3d(0, -4px, 0) rotate(-2deg);
+}
+
+.koc-robot-action-peace .koc-robot-right-arm {
+  transform: translate3d(-20px, -46px, 0) rotate(-118deg);
+}
+
+.koc-robot-action-peace .koc-robot-left-arm {
+  transform: rotate(8deg);
+}
+
+.koc-robot-action-poke .koc-robot-pose {
+  animation: none;
+  transform: translate3d(0, 2px, 0) scale(0.98);
+}
+
+.koc-robot-action-poke .koc-robot-left-arm {
+  transform: translate3d(17px, -12px, 0) rotate(-36deg);
+}
+
+.koc-robot-action-poke .koc-robot-right-arm {
+  transform: translate3d(-17px, -12px, 0) rotate(36deg);
+}
+
+.koc-robot-eye {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: koc-robot-blink 4.2s ease-in-out infinite;
+  transition: opacity 0.2s ease;
+}
+
+.koc-robot-reference-wink,
+.koc-robot-mouth-default,
+.koc-robot-mouth-hop {
+  transform-box: fill-box;
+  transform-origin: center;
+  transition:
+    opacity 0.22s ease,
+    transform 0.32s cubic-bezier(0.2, 0.84, 0.22, 1);
+}
+
+.koc-robot-mouth-hop {
+  opacity: 0;
+}
+
+.koc-robot-action-hop .koc-robot-mouth-default {
+  opacity: 0;
+}
+
+.koc-robot-action-hop .koc-robot-mouth-hop {
+  opacity: 1;
+}
+
+.koc-robot-blush,
+.koc-robot-peace-finger,
+.koc-robot-poke-finger {
+  opacity: 0;
+  transition: opacity 0.22s ease;
+}
+
+.koc-robot-action-peace .koc-robot-peace-finger,
+.koc-robot-action-peace .koc-robot-blush,
+.koc-robot-action-poke .koc-robot-poke-finger,
+.koc-robot-action-poke .koc-robot-blush,
+.koc-robot-action-sit .koc-robot-blush {
+  opacity: 1;
+}
+
+.koc-robot-wave {
+  transform-origin: 100% 0%;
+  animation: koc-home-wave 2.8s ease-in-out infinite;
+}
+
 .koc-shell-box {
   border: 1px solid var(--box-border);
   box-shadow: var(--box-shadow);
@@ -456,6 +883,298 @@ img[src*="koc-assets%2Ficons"] {
 @keyframes koc-loading-spin {
   to {
     transform: rotate(360deg);
+  }
+}
+
+@keyframes koc-rise-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 36px, 0);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes koc-home-bubble {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: translate3d(0, 8px, 0) scale(0.96);
+  }
+
+  18%,
+  76% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes koc-home-float {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+
+  50% {
+    transform: translate3d(0, -8px, 0);
+  }
+}
+
+@keyframes koc-home-wave {
+  0%,
+  100% {
+    transform: rotate(8deg);
+  }
+
+  50% {
+    transform: rotate(22deg);
+  }
+}
+
+@keyframes koc-robot-blink {
+  0%,
+  43%,
+  49%,
+  100% {
+    transform: scaleY(1);
+  }
+
+  46% {
+    transform: scaleY(0.12);
+  }
+}
+
+@keyframes koc-robot-hop {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+
+  38% {
+    transform: translate3d(0, -22px, 0) scale(1.04, 0.96);
+  }
+
+  66% {
+    transform: translate3d(0, 3px, 0) scale(0.98, 1.02);
+  }
+}
+
+@keyframes koc-home-glitter-fall {
+  0% {
+    opacity: 0;
+    transform: translate3d(-50%, -50%, 0) rotate(var(--rotate)) scale(0.56);
+  }
+
+  14% {
+    opacity: 1;
+  }
+
+  74% {
+    opacity: 0.96;
+    transform: translate3d(calc(-50% + var(--dx)), calc(-50% + var(--dy)), 0) rotate(calc(var(--rotate) + 16deg)) scale(1);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate3d(calc(-50% + calc(var(--dx) * 1.08)), calc(-50% + calc(var(--dy) * 1.08)), 0) rotate(calc(var(--rotate) + 24deg)) scale(0.88);
+  }
+}
+
+@keyframes koc-brand-intro-exit {
+  0%,
+  82% {
+    opacity: 1;
+    visibility: visible;
+  }
+
+  100% {
+    opacity: 0;
+    visibility: hidden;
+  }
+}
+
+@keyframes koc-brand-intro-brighten {
+  0% {
+    opacity: 0;
+    transform: translate3d(22vw, -6vh, 0) rotate(-8deg) scale(0.9);
+  }
+
+  42% {
+    opacity: 0.9;
+  }
+
+  78% {
+    opacity: 0.58;
+    transform: translate3d(-4vw, 2vh, 0) rotate(-5deg) scale(1.04);
+  }
+
+  100% {
+    opacity: 0.16;
+    transform: translate3d(-8vw, 3vh, 0) rotate(-4deg) scale(1.08);
+  }
+}
+
+@keyframes koc-brand-intro-glow {
+  0% {
+    opacity: 0;
+    transform: translate3d(22vw, -6vh, 0) rotate(-9deg) scale(0.94);
+  }
+
+  28%,
+  72% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0.18;
+    transform: translate3d(-6vw, 3vh, 0) rotate(-5deg) scale(1.08);
+  }
+}
+
+@keyframes koc-brand-intro-ribbon-sweep {
+  0% {
+    opacity: 0;
+    transform: translate3d(22vw, -5vh, 0) rotate(-7deg) scale(0.96);
+  }
+
+  18% {
+    opacity: 0.96;
+  }
+
+  72% {
+    opacity: 1;
+    transform: translate3d(-3vw, 2vh, 0) rotate(-3deg) scale(1.02);
+  }
+
+  100% {
+    opacity: 0.28;
+    transform: translate3d(-9vw, 5vh, 0) rotate(-1deg) scale(1.08);
+  }
+}
+
+@keyframes koc-brand-intro-ribbon-draw {
+  0% {
+    stroke-dashoffset: 1420;
+  }
+
+  70% {
+    stroke-dashoffset: 100;
+  }
+
+  100% {
+    stroke-dashoffset: -220;
+  }
+}
+
+@keyframes koc-brand-intro-particle {
+  0% {
+    opacity: 0;
+    transform: translate3d(24vw, -5vh, 0) scale(0.35);
+  }
+
+  22% {
+    opacity: var(--intro-opacity, 0.82);
+  }
+
+  64% {
+    opacity: var(--intro-opacity, 0.82);
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate3d(var(--intro-drift-x), var(--intro-drift-y), 0) scale(0.74);
+  }
+}
+
+@keyframes koc-brand-intro-logo {
+  0% {
+    opacity: 0;
+    filter: blur(10px);
+    transform: translate3d(-50%, -43%, 0) scale(0.94);
+  }
+
+  28%,
+  76% {
+    opacity: 1;
+    filter: blur(0);
+    transform: translate3d(-50%, -48%, 0) scale(1);
+  }
+
+  100% {
+    opacity: 0;
+    filter: blur(3px);
+    transform: translate3d(-50%, -50%, 0) scale(1.02);
+  }
+}
+
+@keyframes koc-brand-intro-logo-ribbon {
+  0% {
+    opacity: 0;
+    transform: translate3d(28vw, -50%, 0) rotate(-7deg) scaleX(0.38);
+  }
+
+  38% {
+    opacity: 0.9;
+    transform: translate3d(0, -50%, 0) rotate(-5deg) scaleX(1);
+  }
+
+  78% {
+    opacity: 0.72;
+    transform: translate3d(-3vw, -50%, 0) rotate(-4deg) scaleX(0.96);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate3d(-8vw, -50%, 0) rotate(-3deg) scaleX(0.82);
+  }
+}
+
+@keyframes koc-brand-intro-logo-sparks {
+  0% {
+    opacity: 0;
+    transform: translate3d(3vw, -1vh, 0) scale(0.82);
+  }
+
+  36%,
+  78% {
+    opacity: 0.95;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate3d(-2vw, 1vh, 0) scale(1.08);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  .koc-brand-intro {
+    display: none;
+  }
+
+  .koc-rise-in,
+  .koc-scroll-reveal,
+  .koc-home-glitter,
+  .koc-home-bubble,
+  .koc-robot-pose,
+  .koc-robot-head,
+  .koc-robot-body,
+  .koc-robot-arm,
+  .koc-robot-leg,
+  .koc-robot-eye,
+  .koc-robot-wave {
+    animation: none;
+    opacity: 1;
+    transform: none;
+    transition: none;
   }
 }
 

@@ -17,8 +17,8 @@ export default function ChatMessageBubble({
 }) {
   const baseClassName =
     variant === 'user'
-      ? 'koc-song-font koc-chat-bubble-user ml-[12%] max-w-[min(72%,680px)] rounded-[18px] px-5 py-3 text-[15px] leading-7'
-      : 'koc-song-font koc-chat-bubble-agent rounded-[18px] p-6 text-[16px] font-medium leading-[1.75] select-none';
+      ? 'koc-song-font koc-chat-bubble-user ml-[12%] max-w-[min(78%,720px)] rounded-[12px] px-4 py-2.5 text-[15px] leading-7'
+      : 'koc-song-font koc-chat-bubble-agent max-w-[min(78%,720px)] rounded-[12px] p-4 text-[15px] font-medium leading-[1.72] select-none';
 
   const textColorClassName = inheritTextColor ? 'text-[var(--foreground)]' : 'text-[var(--foreground)]';
   const blockCopyEvents =
