@@ -1,6 +1,6 @@
 'use client';
 
-import type { ClipboardEvent, MouseEvent, ReactNode, SyntheticEvent } from 'react';
+import type { ClipboardEvent, MouseEvent, ReactNode } from 'react';
 
 export default function ChatMessageBubble({
   variant,
@@ -26,7 +26,6 @@ export default function ChatMessageBubble({
       ? {
           onCopy: (event: ClipboardEvent<HTMLDivElement>) => event.preventDefault(),
           onContextMenu: (event: MouseEvent<HTMLDivElement>) => event.preventDefault(),
-          onSelectStart: (event: SyntheticEvent<HTMLDivElement>) => event.preventDefault(),
         }
       : {};
 

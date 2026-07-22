@@ -49,6 +49,8 @@ def build_tool_call(
         inputSummary={
             "source": request.source,
             "query": request.query,
+            "queries": (request.filters or {}).get("queries"),
+            "sourcePreference": (request.filters or {}).get("sourcePreference"),
             "platform": request.platform,
             "limit": request.limit,
         },
@@ -86,4 +88,3 @@ def timed_search(
         result = unavailable_result(request, message=str(exc))
     duration_ms = int((time.perf_counter() - started) * 1000)
     return result, build_tool_call(request=request, result=result, duration_ms=duration_ms)
-

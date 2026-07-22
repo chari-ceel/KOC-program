@@ -1,4 +1,11 @@
 const inlineSectionLabels = [
+  '人设标题',
+  '内容方向',
+  '目标受众',
+  '内容风格',
+  '趋势维度',
+  '趋势总结',
+  '当前热点包括',
   '为什么值得追',
   '与人设匹配',
   '和您人设怎么匹配',
@@ -9,6 +16,18 @@ const inlineSectionLabels = [
   '下一步验证',
   '应该怎么验证',
   '总结一下',
+];
+
+const lineBoldLabels = [
+  '人设标题',
+  '内容方向',
+  '目标受众',
+  '内容风格',
+  '趋势维度',
+  '趋势总结',
+  '当前热点包括',
+  '受众需求',
+  '推荐选题',
 ];
 
 interface NormalizeAiMarkdownOptions {
@@ -92,6 +111,9 @@ function normalizeSectionMarkers(content: string) {
 
 function normalizeDanglingMarkdownMarkers(content: string) {
   return content
+    .replace(/\*\*([^*\n]*?[：:])\s+\*\*/g, '**$1**')
+    .replace(/\*\*([^*\n]*?[：:])\*\*(?=\S)/g, '**$1** ')
+    .replace(/\*\*([^*\n]*?[：:])\s+([^\n]+?)\*\*/g, '**$1** $2')
     .replace(/([：:])\s*\*\s+([^\n]+)/g, (_match, prefix: string, items: string) => {
       const normalizedItems = items
         .split(/\s+\*\s+/)
@@ -113,6 +135,29 @@ function normalizeDanglingMarkdownMarkers(content: string) {
     .replace(/\n{3,}/g, '\n\n');
 }
 
+function normalizeKnownBoldLabels(content: string) {
+  const labelPattern = lineBoldLabels.map(escapeRegExp).join('|');
+  return content
+    .replace(new RegExp(`(^|\\n)(\\s*(?:[-*]\\s*)?)(?!\\*\\*)(${labelPattern})\\s*[:：]\\s*`, 'g'), '$1$2**$3：** ')
+    .replace(new RegExp(`(^|\\n)(\\s*(?:[-*]\\s*)?)\\*\\*\\s*(${labelPattern})\\s*[:：]\\s*\\*\\*\\s*`, 'g'), '$1$2**$3：** ');
+}
+
+function normalizeRecommendationList(content: string) {
+  return content.replace(
+    /(^|\n)(\s*(?:[-*]\s*)?\*\*推荐选题：\*\*)\s*([^\n]*(?:\d{1,2}[.)、]\s*)[^\n]+)/g,
+    (_match, prefix: string, label: string, rawItems: string) => {
+      const items = rawItems
+        .replace(/[；;]\s*(?=\d{1,2}[.)、]\s*)/g, '\n')
+        .split(/\n+/)
+        .map((item) => item.trim())
+        .filter(Boolean)
+        .map((item) => item.replace(/^(\d{1,2})[、)]\s*/, '$1. '));
+
+      return `${prefix}${label}\n${items.join('\n')}`;
+    },
+  );
+}
+
 function demoteValidationKeywordFormatting(content: string) {
   return content
     .replace(/(^|\n)\s*#{1,6}\s*(下一步验证|应该怎么验证|验证关键词)[：:？?]?\s*$/gm, '$1$2：')
@@ -121,21 +166,25 @@ function demoteValidationKeywordFormatting(content: string) {
 
 export function normalizeAiMarkdown(content: string, options: NormalizeAiMarkdownOptions = {}) {
   const protectedCode = protectFencedCodeBlocks(content.replace(/\r\n/g, '\n').replace(/\t/g, '  '));
-  let normalized = normalizeDanglingMarkdownMarkers(
-    normalizeSectionMarkers(
-      protectedCode.content
+  let normalized = normalizeRecommendationList(
+    normalizeKnownBoldLabels(
+      normalizeDanglingMarkdownMarkers(
+        normalizeSectionMarkers(
+          protectedCode.content
         // 容错一些常见的“伪代码块”写法。
-        .replace(/^[`~]{3,}\s*$/gm, '```')
+            .replace(/^[`~]{3,}\s*$/gm, '```')
         // 模型偶尔会漏掉列表/编号和加粗之间的空格，先补成标准 Markdown。
-        .replace(/(^|\n)(\s*[-+])\s*(\*{1,2}[^*\n]{1,80}[：:？?]\*{1,2})(?=\S)/g, '$1$2 $3 ')
-        .replace(/(^|\n)(\s*\d{1,3}[.)])\s*(\*{1,2}[^*\n]{1,80}[：:？?]\*{1,2})(?=\S)/g, '$1$2 $3 ')
+            .replace(/(^|\n)(\s*[-+])\s*(\*{1,2}[^*\n]{1,80}[：:？?]\*{1,2})(?=\S)/g, '$1$2 $3 ')
+            .replace(/(^|\n)(\s*\d{1,3}[.)])\s*(\*{1,2}[^*\n]{1,80}[：:？?]\*{1,2})(?=\S)/g, '$1$2 $3 ')
         // 把黏在正文里的 markdown 标题拆出来，避免整段挤成一行。
-        .replace(/([^\n])\s*(#{1,6}\s+)/g, '$1\n\n$2')
+            .replace(/([^\n])\s*(#{1,6}\s+)/g, '$1\n\n$2')
         // 把 "*标题：*正文" 拆成两段，后面再转标题。
-        .replace(/(\*{1,2}[^*\n]{1,60}[：:？?]\*{1,2})(?=\S)/g, '$1\n\n')
-        .replace(/(?<=\S)(\*{1,2}[^*\n]{1,60}[：:？?]\*{1,2})/g, '\n\n$1')
+            .replace(/(\*{1,2}[^*\n]{1,60}[：:？?]\*{1,2})(?=\S)/g, '$1\n\n')
+            .replace(/(?<=\S)(\*{1,2}[^*\n]{1,60}[：:？?]\*{1,2})/g, '\n\n$1')
         // 给常见中文段落标题补换行，修复模型把所有内容压在一段里的情况。
-        .replace(new RegExp(`\\s+(${inlineSectionLabels.map(escapeRegExp).join('|')})([：:？?]?)\\s*`, 'g'), '\n\n$1$2\n\n'),
+            .replace(new RegExp(`\\s+(${inlineSectionLabels.map(escapeRegExp).join('|')})([：:？?]?)\\s*`, 'g'), '\n\n$1$2\n\n'),
+        ),
+      ),
     ),
   )
     .replace(/\r\n/g, '\n')
@@ -145,6 +194,10 @@ export function normalizeAiMarkdown(content: string, options: NormalizeAiMarkdow
     .replace(/^(#{1,6}\s+.+)\n(?!\n|[-*]\s|\d+[.)]\s)/gm, '$1\n\n')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
+
+  normalized = normalizeRecommendationList(
+    normalizeKnownBoldLabels(normalized.replace(/(^|\n)\*\*([^*\n]{1,40}[：:])\s+([^\n]+)/g, '$1**$2** $3')),
+  );
 
   if (options.plainValidationKeywords) {
     normalized = demoteValidationKeywordFormatting(normalized).replace(/\n{3,}/g, '\n\n').trim();

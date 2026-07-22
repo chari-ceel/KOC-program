@@ -834,18 +834,18 @@ export default function ProfilePage() {
   const showSavedInfo = useCallback(async () => {
     if (!isAuthenticated) {
       setPersonaRecords([]);
-      showNotice('登录后可以查看 7 天内人设历史，并收藏人设长期保存。', 'error');
+      showNotice('登录后可以查看长期保存的人设项目。', 'error');
       return;
     }
 
     setIsPersonaHistoryLoading(true);
     try {
       const records = await loadPersonaHistory();
-      showNotice(records.length ? '已读取 7 天内保存的人设历史。' : '近 7 天还没有保存过人设。', 'info');
+      showNotice(records.length ? '已读取已保存的人设项目。' : '还没有保存过人设。', 'info');
     } catch (error) {
       console.error('Failed to load persona history', error);
       setPersonaRecords([]);
-      showNotice('读取人设历史失败，请稍后重试。', 'error');
+      showNotice('读取已保存人设失败，请稍后重试。', 'error');
     } finally {
       setIsPersonaHistoryLoading(false);
     }
@@ -885,30 +885,8 @@ export default function ProfilePage() {
     showNotice('', 'info');
   }, [applyInfo, conversationScopeId, showNotice]);
 
-  const togglePersonaFavorite = useCallback(async (record: PersonaRecord) => {
-    try {
-      const response = await fetch(`${API_BASE}/api/persona/favorite`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          recordId: record.id,
-          isFavorited: !record.isFavorited,
-        }),
-      });
-      const result = await readJsonResponse(response);
-      const updated = isRecord(result) && isRecord(result.data) ? normalizePersonaRecord(result.data.record) : null;
-      if (!response.ok || !updated) throw new Error('收藏状态更新失败');
-      setPersonaRecords((records) => records.map((item) => (item.id === updated.id ? updated : item)));
-      showNotice(updated.isFavorited ? '已收藏，人设将长期保存。' : '已取消收藏，普通记录仍按 7 天保留。', 'success', true);
-    } catch (error) {
-      console.error('Failed to update persona favorite', error);
-      showNotice('收藏状态更新失败，请稍后重试。', 'error');
-    }
-  }, [showNotice]);
-
   const deletePersonaRecord = useCallback(async (record: PersonaRecord) => {
-    if (!window.confirm('确定要删除这条人设记录吗？删除后历史和收藏中都不会再显示。')) return;
+    if (!window.confirm('确定要删除这条人设记录吗？删除后已保存人设中不会再显示。')) return;
     try {
       const response = await fetch(`${API_BASE}/api/persona/record/${encodeURIComponent(record.id)}`, {
         method: 'DELETE',
@@ -1636,7 +1614,7 @@ export default function ProfilePage() {
                 </button>
               </div>
               <p className="mt-2 text-center text-[13px] leading-5 text-[var(--foreground)]/75">
-                普通保存的人设记录仅保留 7 天，7 天后自动删除；收藏人设可长期保存。
+                保存后的人设会长期保留，可作为人设项目继续开启新的内容对话。
               </p>
               </div>
             </form>
@@ -1661,17 +1639,15 @@ export default function ProfilePage() {
                 {(isPersonaHistoryLoading || personaRecords.length > 0) && (
                   <div className="mt-4 space-y-4">
                     <div className="rounded-[12px] border border-[var(--box-border)] bg-[rgba(255,255,255,0.72)] px-4 py-3 text-[14px] leading-6">
-                      普通保存的人设记录只保留 7 天，7 天后会自动删除；点击右上角收藏后，人设会长期保存在“人设收藏”中。
+                      保存后的人设会长期保留，也可以作为人设项目继续开启热门追踪。
                     </div>
                     {isPersonaHistoryLoading ? (
-                      <p className="koc-song-font text-[15px]">正在读取人设历史...</p>
+                      <p className="koc-song-font text-[15px]">正在读取已保存人设...</p>
                     ) : (
                       <div className="grid gap-3 md:grid-cols-2">
                         {personaRecords.map((record) => {
                           const card = getPersonaCardViewModel(record.persona, {
                             savedAt: record.savedAt,
-                            expiresAt: record.expiresAt,
-                            isFavorite: record.isFavorited,
                           });
                           return (
                             <article
@@ -1680,22 +1656,14 @@ export default function ProfilePage() {
                             >
                               <button
                                 type="button"
-                                onClick={() => void togglePersonaFavorite(record)}
-                                className="absolute right-3 top-3 rounded-full border border-[#DE868F]/45 bg-white px-2.5 py-1 text-[16px] text-[#DE868F] shadow-[var(--box-shadow)] transition hover:bg-[#fff3f5]"
-                                title={record.isFavorited ? '取消收藏' : '收藏人设，长期保存'}
-                              >
-                                {record.isFavorited ? '★' : '☆'}
-                              </button>
-                              <button
-                                type="button"
                                 onClick={() => void deletePersonaRecord(record)}
-                                className="absolute right-14 top-3 flex size-[32px] items-center justify-center rounded-full border border-[var(--box-border)] bg-[rgba(255,255,255,0.94)] text-[15px] text-[var(--foreground)] shadow-[var(--box-shadow)] transition hover:bg-[rgba(255,255,255,0.82)]"
+                                className="absolute right-3 top-3 flex size-[32px] items-center justify-center rounded-full border border-[var(--box-border)] bg-[rgba(255,255,255,0.94)] text-[15px] text-[var(--foreground)] shadow-[var(--box-shadow)] transition hover:bg-[rgba(255,255,255,0.82)]"
                                 title="删除人设"
                                 aria-label="删除人设"
                               >
                                 🗑
                               </button>
-                              <p className="koc-heading-font line-clamp-1 pr-28 text-[18px] leading-tight">{card.title}</p>
+                              <p className="koc-heading-font line-clamp-1 pr-12 text-[18px] leading-tight">{card.title}</p>
                               <div className="mt-2 space-y-1 text-[13px] leading-5 text-[var(--foreground)]">
                                 <p className="line-clamp-1">{card.fitLine}</p>
                                 <p className="line-clamp-1">{card.hookLine}</p>
@@ -1729,15 +1697,6 @@ export default function ProfilePage() {
                           );
                         })}
                       </div>
-                    )}
-                    {!isPersonaHistoryLoading && personaRecords.length > 0 && (
-                      <button
-                        type="button"
-                        onClick={() => router.push('/persona-favorites')}
-                        className="koc-heading-font rounded-full border border-[#888888] bg-[rgba(255,255,255,0.94)] px-5 py-2.5 text-[14px] text-[var(--foreground)] shadow-[var(--box-shadow)] transition hover:bg-[rgba(255,255,255,0.82)]"
-                      >
-                        查看人设收藏
-                      </button>
                     )}
                   </div>
                 )}

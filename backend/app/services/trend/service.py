@@ -115,7 +115,9 @@ class TrendService:
                 "debug": build_agent_debug_payload(response, agent_debug),
             }
 
-        complete_analysis = self._build_complete_analysis(response.data)
+        response_data = dict(response.data or {})
+        response_data.setdefault("originalUserPreference", preference)
+        complete_analysis = self._build_complete_analysis(response_data)
         next_memory_state = await self.memory_service.refresh_state(
             user_id=user_id,
             scope_id=conversation_scope_id,
@@ -128,8 +130,8 @@ class TrendService:
             "data": {
                 "discussionOnly": complete_analysis is None,
                 "completeAnalysis": complete_analysis,
-                "text": self._format_trend_text(response.data),
-                "raw": response.data,
+                "text": self._format_trend_text(response_data),
+                "raw": response_data,
                 "conversationSummary": next_memory_state.get("conversationSummary"),
                 "memoryMeta": next_memory_state.get("memoryMeta"),
             },
@@ -171,10 +173,11 @@ class TrendService:
             for t in (data.get("topicOpportunities", []) or [])
             if isinstance(t, dict) and t.get("title")
         ]
+        topics = self._complete_topic_titles(data, hot_trends, audience_needs, topics)
         card_preview = self._build_card_preview(data, hot_trends, topics)
 
         complete_analysis = {
-            "trackName": summary.get("niche") or "智能趋势分析",
+            "trackName": self._build_track_name(data, summary, hot_trends, audience_needs, topics),
             "trends": trends_text or "暂无趋势分析。",
             "audience": audience_text or "暂无受众需求洞察。",
             "topics": topics[:3],
@@ -182,13 +185,94 @@ class TrendService:
         }
         return complete_analysis if self._is_complete_analysis(complete_analysis) else None
 
+    def _build_track_name(
+        self,
+        data: Dict[str, Any],
+        summary: Dict[str, Any],
+        hot_trends: list,
+        audience_needs: list,
+        topics: list[str],
+    ) -> str:
+        generic = {"智能趋势分析", "热门趋势", "趋势分析", "热门追踪", "小红书", "涨粉赛道"}
+        candidates: list[Any] = [
+            data.get("originalUserPreference"),
+            summary.get("niche") if isinstance(summary, dict) else "",
+            *(data.get("validationKeywords") or []),
+            *(item.get("name") for item in hot_trends if isinstance(item, dict)),
+            *(item.get("need") for item in audience_needs if isinstance(item, dict)),
+            *topics,
+        ]
+        for candidate in candidates:
+            phrase = self._short_preview_phrase(candidate)
+            if phrase and phrase not in generic:
+                return phrase
+        return "热门追踪"
+
+    def _complete_topic_titles(
+        self,
+        data: Dict[str, Any],
+        hot_trends: list,
+        audience_needs: list,
+        topics: list[str],
+    ) -> list[str]:
+        completed = []
+        for topic in topics:
+            cleaned = self._sanitize_trend_copy(topic)
+            if cleaned and cleaned not in completed:
+                completed.append(cleaned)
+
+        summary = data.get("trendSummary", {}) or {}
+        niche = self._sanitize_trend_copy(summary.get("niche") if isinstance(summary, dict) else "")
+        candidates = []
+        candidates.extend(item.get("name") for item in hot_trends if isinstance(item, dict))
+        candidates.extend(item.get("need") for item in audience_needs if isinstance(item, dict))
+        candidates.extend(data.get("validationKeywords") or [])
+        if niche:
+            candidates.append(niche)
+
+        stems = [self._short_preview_phrase(candidate) for candidate in candidates]
+        if niche:
+            stems.append(self._short_preview_phrase(niche))
+        stems = [stem for stem in stems if stem]
+
+        templates = [
+            "{}新手先看这篇",
+            "{}真实避坑清单",
+            "{}怎么开始更稳",
+            "{}经验分享",
+        ]
+        for stem in stems:
+            for template in templates:
+                title = self._limit_topic_title(template.format(stem))
+                if title and title not in completed:
+                    completed.append(title)
+                if len(completed) >= 3:
+                    return completed[:3]
+
+        fallback_stem = self._short_preview_phrase(niche) or "这个方向"
+        for title in [
+            f"{fallback_stem}新手先看",
+            f"{fallback_stem}避坑清单",
+            f"{fallback_stem}经验分享",
+        ]:
+            title = self._limit_topic_title(title)
+            if title and title not in completed:
+                completed.append(title)
+            if len(completed) >= 3:
+                break
+        return completed[:3]
+
+    def _limit_topic_title(self, title: Any) -> str:
+        cleaned = self._sanitize_trend_copy(title)
+        return cleaned[:20].strip()
+
     def _is_complete_analysis(self, payload: Dict[str, Any]) -> bool:
         track_name = self._sanitize_trend_copy(payload.get("trackName"))
         trends = self._sanitize_trend_copy(payload.get("trends"))
         audience = self._sanitize_trend_copy(payload.get("audience"))
         topics = payload.get("topics") or []
         valid_topics = [topic for topic in topics if isinstance(topic, str) and topic.strip()]
-        return bool(track_name and trends and audience and valid_topics)
+        return bool(track_name and trends and audience and len(valid_topics) >= 3)
 
     def _build_card_preview(self, data: Dict[str, Any], hot_trends: list, topics: list[str]) -> Dict[str, list[str]]:
         raw_preview = data.get("cardPreview") if isinstance(data.get("cardPreview"), dict) else {}
@@ -397,9 +481,9 @@ class TrendService:
         return "\n".join(
             [
                 "这是热门追踪初始页的首条业务输入。",
-                "身份边界：小猪梨只是 Agent 助手昵称，不是用户的人设、账号名或内容主角；用户的具体人设只以 context.savedPersona 为准。",
+                "身份边界：顶流小猪梨只是 Agent 助手昵称，不是用户的人设、账号名或内容主角；用户的具体人设只以 context.savedPersona 为准。",
                 "请把用户原始输入直接理解为本轮要追踪的赛道、方向、偏好或线索，不要先停留在讨论态，也不要只做解释。",
-                "请直接输出一版可展示、可保存的结构化热门追踪结果，保留 trendSummary、hotTrends、audienceNeeds、topicOpportunities、validationKeywords 和 cardPreview，同时多给能转成小红书图文的切入点。",
+                "请直接输出一版可展示、可保存的结构化热门追踪结果，保留 trendSummary、hotTrends、audienceNeeds、topicOpportunities、validationKeywords 和 cardPreview，并在 topicOpportunities 中稳定给出 3 个能直接转成小红书图文的标题方向。",
                 "如果没有真实检索数据，不要伪造热度；请写成保守判断，并给出需要继续验证的关键词。",
                 f"用户原始输入：{raw_input}",
             ]
@@ -429,9 +513,9 @@ class TrendService:
         return "\n".join(
             [
                 "这是热门追踪里的“总结实时进度”专属请求。",
-                "身份边界：小猪梨只是 Agent 助手昵称，不是用户的人设、账号名或内容主角；用户的具体人设只以 context.savedPersona 为准。",
+                "身份边界：顶流小猪梨只是 Agent 助手昵称，不是用户的人设、账号名或内容主角；用户的具体人设只以 context.savedPersona 为准。",
                 "请基于当前整段聊天记录，总结到目前为止已经明确的热点趋势、受众需求和可执行选题，不要只回答某一句追问。",
-                "你必须输出一版可直接用于更新热门追踪概要图和历史卡片的结构化结果，保留 trendSummary、hotTrends、audienceNeeds、topicOpportunities、validationKeywords 和 cardPreview，并突出可转成小红书图文的选题角度。",
+                "你必须输出一版可直接用于更新热门追踪概要图和历史卡片的结构化结果，保留 trendSummary、hotTrends、audienceNeeds、topicOpportunities、validationKeywords 和 cardPreview，并在 topicOpportunities 中稳定给出 3 个可转成小红书图文的标题方向。",
                 "如果聊天里已经出现过多轮趋势分析，请合并为当前最新的一版总结，不要遗漏已经确认过的重要结论。",
                 "当前聊天记录：",
                 history_block,
@@ -568,6 +652,14 @@ class TrendService:
         text = self._strip_terminal_punctuation(value)
         return f"{label}{text}。" if text else ""
 
+    def _display_trend_context_segment(self, value: Any) -> str:
+        text = self._normalize_join_segment(value, strip_sentence_end=True)
+        mapping = {
+            "7d": "近七天",
+            "xiaohongshu": "小红书",
+        }
+        return mapping.get(text.lower(), text)
+
     def _normalize_join_segment(self, value: Any, strip_sentence_end: bool = False) -> str:
         cleaned = self._sanitize_trend_copy(value)
         if not cleaned:
@@ -581,28 +673,24 @@ class TrendService:
         return cleaned
 
     def _format_trend_text(self, data: Dict[str, Any]) -> str:
-        reply = data.get("reply")
-        if isinstance(reply, str) and reply.strip():
-            return self._sanitize_trend_reply(reply.strip())
-
         summary = data.get("trendSummary", {}) or {}
         if isinstance(summary, str):
             summary = {"summary": summary}
         trend_summary = self._normalize_join_segment(summary.get("summary"), strip_sentence_end=True)
         context_parts = [
-            self._normalize_join_segment(summary.get("period"), strip_sentence_end=True),
-            self._normalize_join_segment(summary.get("platform"), strip_sentence_end=True),
-            self._normalize_join_segment(summary.get("niche"), strip_sentence_end=True),
+            self._display_trend_context_segment(summary.get("period")),
+            self._display_trend_context_segment(summary.get("platform")),
+            self._display_trend_context_segment(summary.get("niche")),
         ]
         context_text = " / ".join([part for part in context_parts if part])
 
         lines = []
         if context_text:
-            line = self._format_sentence_line("趋势维度：", context_text)
+            line = self._format_sentence_line("**趋势维度：**", context_text)
             if line:
                 lines.append(line)
         if trend_summary:
-            line = self._format_sentence_line("趋势总结：", trend_summary)
+            line = self._format_sentence_line("**趋势总结：**", trend_summary)
             if line:
                 lines.append(line)
 
@@ -617,7 +705,7 @@ class TrendService:
                 elif name:
                     hot_items.append(name)
             if hot_items:
-                line = self._format_sentence_line("当前热点包括：", "；".join(hot_items))
+                line = self._format_sentence_line("**当前热点包括：**", "；".join(hot_items))
                 if line:
                     lines.append(line)
 
@@ -632,7 +720,7 @@ class TrendService:
                 elif need:
                     needs_items.append(need)
             if needs_items:
-                line = self._format_sentence_line("受众需求：", "；".join(needs_items))
+                line = self._format_sentence_line("**受众需求：**", "；".join(needs_items))
                 if line:
                     lines.append(line)
 
@@ -647,11 +735,14 @@ class TrendService:
                 elif title:
                     topic_lines.append(f"{idx}. {title}")
             if topic_lines:
-                line = self._format_sentence_line("推荐选题：", "；".join(topic_lines))
-                if line:
-                    lines.append(line)
+                lines.append("**推荐选题：**\n" + "\n".join(topic_lines))
 
-        return "\n".join(lines) if lines else "暂无趋势结果。"
+        if lines:
+            return "\n".join(lines)
+        reply = data.get("reply")
+        if isinstance(reply, str) and reply.strip():
+            return self._sanitize_trend_reply(reply.strip())
+        return "暂无趋势结果。"
 
     def _sanitize_trend_reply(self, text: Any) -> str:
         if not isinstance(text, str):
@@ -722,8 +813,26 @@ class TrendService:
         cleaned = re.sub(r"^[；，、\s]+", "", cleaned)
         cleaned = re.sub(r"[；，、\s]+$", "", cleaned)
         cleaned = re.sub(r"。{2,}", "。", cleaned)
+        cleaned = self._enforce_graphic_text_copy(cleaned)
 
         return cleaned.strip()
+
+    def _enforce_graphic_text_copy(self, text: str) -> str:
+        replacements = [
+            (r"B站长视频|b站长视频|B 站长视频|b 站长视频", "小红书图文笔记"),
+            (r"抖音短视频|抖音脚本|抖音视频", "小红书图文笔记"),
+            (r"短视频脚本|视频脚本|视频分镜|口播脚本|拍摄脚本", "图文笔记"),
+            (r"短视频", "图文笔记"),
+            (r"视频", "图文"),
+            (r"拍摄难度", "素材准备难度"),
+            (r"拍摄周期", "图文制作周期"),
+            (r"拍摄成本", "素材准备成本"),
+            (r"镜头", "图片"),
+        ]
+        cleaned = text
+        for pattern, replacement in replacements:
+            cleaned = re.sub(pattern, replacement, cleaned, flags=re.IGNORECASE)
+        return cleaned
 
     def _tighten_trend_copy(self, text: Any) -> str:
         if not isinstance(text, str):

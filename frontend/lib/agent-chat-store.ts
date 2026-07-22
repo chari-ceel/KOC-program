@@ -1,4 +1,4 @@
-import type { AgentFlowSummary, AgentLocalConversation, AgentMessage } from '@/lib/agent-chat-contract';
+import type { AgentChatAction, AgentFlowSummary, AgentLocalConversation, AgentMessage, AgentQuestionBlock } from '@/lib/agent-chat-contract';
 
 export const AGENT_CHAT_CONVERSATIONS_STORAGE_KEY = 'koc-agent-local-conversations';
 export const AGENT_CHAT_ACTIVE_CONVERSATION_STORAGE_KEY = 'koc-agent-active-conversation-id';
@@ -8,6 +8,12 @@ export const AGENT_CHAT_CONVERSATIONS_UPDATED_EVENT = 'koc-agent-conversations-u
 export const AGENT_CHAT_CREATE_CONVERSATION_EVENT = 'koc-agent-create-conversation';
 export const AGENT_CHAT_SELECT_CONVERSATION_EVENT = 'koc-agent-select-conversation';
 export const SIDEBAR_COLLAPSE_EVENT = 'koc-sidebar-collapse-request';
+const WELCOME_MESSAGE_CONTENT =
+  'Hi，我是你的顶流小猪梨呀~ 我们先把你这个账号的人设聊清楚，再去做热门追踪，最后写成小红书图文笔记。\n\n先不用想得很专业，从下面 3 个问题里挑一个回答就行。';
+
+const INITIAL_PERSONA_QUESTIONS: AgentQuestionBlock[] = [];
+
+const INITIAL_PERSONA_ACTIONS: AgentChatAction[] = [];
 
 export const defaultAgentSummary: AgentFlowSummary = {
   persona: {
@@ -37,9 +43,22 @@ export function createWelcomeMessage(): AgentMessage {
   return {
     id: 'assistant_welcome',
     role: 'assistant',
-    content: '你好，我是 KOC Agent。我们先做人设打造；你满意后，我再带你做热门追踪和内容撰写。',
+    content: WELCOME_MESSAGE_CONTENT,
+    question_blocks: INITIAL_PERSONA_QUESTIONS,
     created_at: new Date().toISOString(),
   };
+}
+
+function normalizeWelcomeMessages(messages: AgentMessage[]) {
+  return messages.map((message) =>
+    message.id === 'assistant_welcome'
+      ? {
+          ...message,
+          content: WELCOME_MESSAGE_CONTENT,
+          question_blocks: Array.isArray(message.question_blocks) && message.question_blocks.length ? message.question_blocks : INITIAL_PERSONA_QUESTIONS,
+        }
+      : message,
+  );
 }
 
 function createLocalId() {
@@ -92,6 +111,10 @@ export function createEmptyConversation(index = 1): AgentLocalConversation {
     messages: [createWelcomeMessage()],
     summary: defaultAgentSummary,
     current_step: 'persona',
+    conversation_kind: 'draft',
+    create_status: 'ready',
+    source_persona_record_id: null,
+    parent_conversation_id: null,
     selected_persona_id: null,
     selected_topic_id: null,
     phase_approval: {
@@ -100,6 +123,10 @@ export function createEmptyConversation(index = 1): AgentLocalConversation {
       content: false,
     },
     content_points: [],
+    actions: INITIAL_PERSONA_ACTIONS,
+    question_blocks: INITIAL_PERSONA_QUESTIONS,
+    readiness: {},
+    copy_payload: {},
     updated_at: new Date().toISOString(),
   };
 }
@@ -122,17 +149,25 @@ export function readLocalConversations(): AgentLocalConversation[] {
         ...createEmptyConversation(index + 1),
         ...conversation,
         title: conversation.title || `临时对话 ${index + 1}`,
-        messages: conversation.messages.length ? conversation.messages : [createWelcomeMessage()],
+        messages: conversation.messages.length ? normalizeWelcomeMessages(conversation.messages) : [createWelcomeMessage()],
         summary: {
           ...defaultAgentSummary,
           ...(conversation.summary || {}),
         },
+        conversation_kind: conversation.conversation_kind || 'draft',
+        create_status: conversation.create_status || 'ready',
+        source_persona_record_id: conversation.source_persona_record_id || null,
+        parent_conversation_id: conversation.parent_conversation_id || null,
         phase_approval: {
           persona: Boolean(conversation.phase_approval?.persona),
           trending: Boolean(conversation.phase_approval?.trending),
           content: Boolean(conversation.phase_approval?.content),
         },
         content_points: Array.isArray(conversation.content_points) ? conversation.content_points : [],
+        actions: Array.isArray(conversation.actions) && conversation.actions.length ? conversation.actions : INITIAL_PERSONA_ACTIONS,
+        question_blocks: Array.isArray(conversation.question_blocks) ? conversation.question_blocks : [],
+        readiness: conversation.readiness || {},
+        copy_payload: conversation.copy_payload || {},
       }));
   } catch {
     return [];

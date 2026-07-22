@@ -12,6 +12,27 @@ interface MarkdownTextProps {
   plainValidationKeywords?: boolean;
 }
 
+const boldLineLabels = [
+  '人设标题',
+  '内容方向',
+  '目标受众',
+  '内容风格',
+  '趋势维度',
+  '趋势总结',
+  '当前热点包括',
+  '受众需求',
+  '推荐选题',
+];
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function boldKnownLineLabels(content: string) {
+  const labelPattern = boldLineLabels.map(escapeRegExp).join('|');
+  return content.replace(new RegExp(`^(\\s*(?:[-*]\\s*)?)(?!\\*\\*)(${labelPattern})\\s*[:：]\\s*`, 'gmu'), '$1**$2：**');
+}
+
 export default function MarkdownText({
   content,
   className = '',
@@ -19,7 +40,7 @@ export default function MarkdownText({
   inheritTextColor = false,
   plainValidationKeywords = false,
 }: MarkdownTextProps) {
-  const normalized = normalizeAiMarkdown(content, { plainValidationKeywords });
+  const normalized = boldKnownLineLabels(normalizeAiMarkdown(content, { plainValidationKeywords }));
   const textColor = inheritTextColor ? 'text-inherit' : 'text-[var(--foreground)]';
   const headingColor = inheritTextColor ? 'text-inherit' : '';
 
@@ -64,7 +85,7 @@ export default function MarkdownText({
             </a>
           ),
           hr: () => <hr className="my-4 border-[var(--box-border)]" />,
-          strong: ({ children }) => (disableEmphasis ? <>{children}</> : <strong className="font-semibold">{children}</strong>),
+          strong: ({ children }) => <strong className="font-bold text-black">{children}</strong>,
           em: ({ children }) => (disableEmphasis ? <>{children}</> : <em className="italic">{children}</em>),
         }}
       >

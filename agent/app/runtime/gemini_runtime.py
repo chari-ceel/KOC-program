@@ -237,6 +237,7 @@ class GeminiRuntime(ModelRuntime):
         if request.task_type == "persona.analyze":
             return {
                 "data": {
+                    "isReadyToSave": "boolean",
                     "persona": {
                         "name": "string, short persona label for the user's account direction, ideally 4-12 Chinese characters, not a full sentence",
                         "description": "string",
@@ -252,7 +253,7 @@ class GeminiRuntime(ModelRuntime):
                         "toneLabel": "string, hidden summary card tone only, ideally 6-12 Chinese characters",
                     },
                     "referenceCreatorDirections": ["string"],
-                    "followUpQuestions": ["string, optional follow-up questions, max 3 items"],
+                    "followUpQuestions": ["string, optional dynamic follow-up questions, max 3 items"],
                 },
                 "savePayload": {
                     "type": "persona_result",
@@ -308,7 +309,7 @@ class GeminiRuntime(ModelRuntime):
                     ],
                     "topicOpportunities": [
                         {
-                            "title": "string",
+                            "title": "string, direct xiaohongshu image-text note title, max 20 Chinese characters; return exactly 3 items",
                             "angle": "string",
                             "fitReason": "string",
                             "difficulty": "low|medium|high",
@@ -331,8 +332,8 @@ class GeminiRuntime(ModelRuntime):
                     "reply": "string, optional conversational answer for discussion turns",
                     "isReadyToSave": "boolean",
                         "draft": {
-                            "titleOptions": ["string"],
-                            "selectedTitle": "string",
+                            "titleOptions": ["string, 3 options, each max 20 Chinese characters"],
+                            "selectedTitle": "string, max 20 Chinese characters",
                             "intro": "string",
                             "body": "string",
                             "ending": "string",
@@ -346,7 +347,10 @@ class GeminiRuntime(ModelRuntime):
                         "cardPreview": {
                             "keywords": ["string, 2-3 short keywords"],
                         },
-                    }
+                    },
+                    "suggestions": [
+                        {"label": "string", "instruction": "string", "intent": "title_optimize|intro_optimize|body_expand|humanize|tag_optimize"}
+                    ],
                 },
                 "savePayload": {
                     "type": "content_draft",
@@ -360,8 +364,8 @@ class GeminiRuntime(ModelRuntime):
                     "reply": "string, optional short explanation for applied changes",
                     "isReadyToSave": "boolean",
                     "revisedDraft": {
-                        "titleOptions": ["string"],
-                        "selectedTitle": "string",
+                        "titleOptions": ["string, 3 options, each max 20 Chinese characters"],
+                        "selectedTitle": "string, max 20 Chinese characters",
                         "intro": "string",
                         "body": "string",
                         "ending": "string",
@@ -372,17 +376,15 @@ class GeminiRuntime(ModelRuntime):
                             "visualStyle": "string",
                         },
                         "imageTextStructure": ["string"],
-                        "videoSuggestion": {
-                            "opening": "string",
-                            "shots": ["string"],
-                            "note": "string",
-                        },
                         "cardPreview": {
                             "keywords": ["string, 2-3 short keywords"],
                         },
                     },
                     "changes": [
                         {"field": "string", "reason": "string"}
+                    ],
+                    "suggestions": [
+                        {"label": "string", "instruction": "string", "intent": "title_optimize|intro_optimize|body_expand|humanize|tag_optimize"}
                     ],
                 },
                 "savePayload": {

@@ -5,20 +5,21 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { API_BASE, readJsonResponse } from '@/lib/api';
+import { API_BASE, isRecord, readJsonResponse } from '@/lib/api';
 import {
   AGENT_CHAT_CONVERSATIONS_UPDATED_EVENT,
   AGENT_CHAT_CREATE_CONVERSATION_EVENT,
   AGENT_CHAT_SELECT_CONVERSATION_EVENT,
   SIDEBAR_COLLAPSE_EVENT,
   canCreateNextConversation,
-  createAndStoreConversation,
+  defaultAgentSummary,
   deleteLocalConversation,
   readActiveConversationId,
   readLocalConversations,
+  upsertLocalConversation,
   writeActiveConversationId,
 } from '@/lib/agent-chat-store';
-import type { AgentLocalConversation } from '@/lib/agent-chat-contract';
+import type { AgentChatAction, AgentChatResponse, AgentConversationCreateStatus, AgentFlowSummary, AgentLocalConversation, AgentMessage, AgentQuestionBlock, AgentStep } from '@/lib/agent-chat-contract';
 
 const SIDEBAR_COLLAPSED_STORAGE_KEY = 'koc-sidebar-collapsed';
 const AVATAR_UPLOAD_MAX_BYTES = 200 * 1024;
@@ -52,17 +53,89 @@ function compactText(text: string, maxLength = 24) {
 }
 
 function getConversationTitle(conversation: AgentLocalConversation) {
-  if (conversation.summary.persona.done) {
-    return compactText(conversation.summary.persona.text, 18) || compactText(conversation.title, 18) || conversation.title;
+  if (conversation.summary.content.done) {
+    return compactText(conversation.summary.content.text, 32) || compactText(conversation.title, 32) || conversation.title;
   }
-  return conversation.title;
+  if (conversation.summary.trending.done) {
+    return compactText(conversation.summary.trending.text, 32) || compactText(conversation.title, 32) || '热门追踪';
+  }
+  if (conversation.current_step === 'content') return '内容撰写';
+  if (conversation.current_step === 'trending' || conversation.summary.persona.done) return '热门追踪';
+  return compactText(conversation.title, 24) || conversation.title;
 }
 
-function compactConversationMeta(conversation: AgentLocalConversation) {
-  const persona = conversation.summary.persona.text.trim();
-  const content = conversation.summary.content.text.trim();
-  const source = persona || content || '新的角色链路';
-  return compactText(source);
+function getProjectTitle(conversation: AgentLocalConversation) {
+  return compactText(conversation.summary.persona.text, 18) || compactText(conversation.title, 18) || conversation.title;
+}
+
+function isPersonaProjectRoot(conversation: AgentLocalConversation) {
+  return Boolean(
+    conversation.source_persona_record_id
+      && conversation.parent_conversation_id
+      && conversation.parent_conversation_id === conversation.local_id,
+  );
+}
+
+function isPersonaProjectConversation(conversation: AgentLocalConversation) {
+  return Boolean(conversation.source_persona_record_id && conversation.summary.persona.done);
+}
+
+function normalizeBackendConversation(record: {
+  conversation_id: string;
+  title?: string;
+  conversation_title?: string;
+  current_step?: AgentStep;
+  summary?: AgentFlowSummary;
+  memory_refs?: {
+    persona_memory_id?: string | null;
+    trending_memory_id?: string | null;
+  };
+  messages?: AgentMessage[];
+  actions?: AgentChatAction[];
+  question_blocks?: AgentQuestionBlock[];
+  readiness?: Partial<Record<AgentStep, string>>;
+  copy_payload?: AgentChatResponse['copy_payload'];
+  conversation_kind?: 'draft' | 'task' | string;
+  create_status?: AgentConversationCreateStatus;
+  source_persona_record_id?: string | null;
+  parent_conversation_id?: string | null;
+  updated_at?: string;
+}): AgentLocalConversation {
+  const summary = record.summary || defaultAgentSummary;
+  const questionBlocks = Array.isArray(record.question_blocks) ? record.question_blocks : [];
+  const backendMessages = Array.isArray(record.messages) ? record.messages : [];
+  const messages = questionBlocks.length
+    ? backendMessages.map((message, index) =>
+        message.role === 'assistant' && index === backendMessages.length - 1
+          ? { ...message, question_blocks: questionBlocks }
+          : message,
+      )
+    : backendMessages;
+  return {
+    local_id: record.conversation_id,
+    conversation_id: record.conversation_id,
+    title: record.conversation_title || record.title || compactText(summary.persona.text, 18) || '新的创作对话',
+    messages,
+    summary,
+    current_step: record.current_step || 'persona',
+    conversation_kind: record.conversation_kind || 'draft',
+    create_status: record.create_status || 'ready',
+    source_persona_record_id: record.source_persona_record_id || null,
+    parent_conversation_id: record.parent_conversation_id || null,
+    selected_persona_id: record.memory_refs?.persona_memory_id || null,
+    selected_topic_id: record.memory_refs?.trending_memory_id || null,
+    phase_approval: {
+      persona: Boolean(summary.persona.done),
+      trending: Boolean(summary.trending.done),
+      content: Boolean(summary.content.done),
+    },
+    content_points: Array.isArray(summary.content.items) ? summary.content.items : [],
+    actions: record.actions || [],
+    question_blocks: questionBlocks,
+    readiness: record.readiness || {},
+    copy_payload: record.copy_payload || {},
+    updated_at: record.updated_at || new Date().toISOString(),
+  };
 }
 
 function AvatarBadge({ value, size = 'md' }: { value?: string; size?: 'sm' | 'md' | 'lg' }) {
@@ -157,11 +230,14 @@ export default function Sidebar() {
     openAuthDialog,
     openUnlockDialog,
   } = useAuth();
-  const [isCollapsed, setIsCollapsed] = useState(() => readInitialCollapsed(pathname));
+  const [isCollapsed, setIsCollapsed] = useState(pathname === '/');
+  const [hasLoadedCollapsedPreference, setHasLoadedCollapsedPreference] = useState(false);
   const [searchValue, setSearchValue] = useState('');
   const [conversations, setConversations] = useState<AgentLocalConversation[]>([]);
   const [activeConversationId, setActiveConversationId] = useState('');
   const [sidebarNotice, setSidebarNotice] = useState('');
+  const [deletingConversationId, setDeletingConversationId] = useState('');
+  const [creatingProjectId, setCreatingProjectId] = useState('');
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [profileNameDraft, setProfileNameDraft] = useState('');
   const [profileAvatarDraft, setProfileAvatarDraft] = useState('');
@@ -177,19 +253,46 @@ export default function Sidebar() {
   const userModuleRef = useRef<HTMLDivElement | null>(null);
 
   const syncConversations = useCallback(() => {
+    if (isAuthenticated) {
+      void fetch(`${API_BASE}/api/agent/conversations`, { credentials: 'include' })
+        .then((response) => (response.ok ? response.json() : Promise.reject(new Error('load failed'))))
+        .then((payload: { conversations?: Parameters<typeof normalizeBackendConversation>[0][] }) => {
+          setConversations((payload.conversations || []).map(normalizeBackendConversation));
+          setActiveConversationId(readActiveConversationId());
+        })
+        .catch(() => {
+          setConversations([]);
+          setActiveConversationId(readActiveConversationId());
+          setSidebarNotice('对话列表暂时没有读到，可以稍后刷新再试。');
+        });
+      return;
+    }
     setConversations(readLocalConversations());
     setActiveConversationId(readActiveConversationId());
-  }, []);
+  }, [isAuthenticated]);
 
   useEffect(() => {
-    syncConversations();
+    const timer = window.setTimeout(syncConversations, 0);
     window.addEventListener(AGENT_CHAT_CONVERSATIONS_UPDATED_EVENT, syncConversations);
-    return () => window.removeEventListener(AGENT_CHAT_CONVERSATIONS_UPDATED_EVENT, syncConversations);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener(AGENT_CHAT_CONVERSATIONS_UPDATED_EVENT, syncConversations);
+    };
   }, [syncConversations]);
 
   useEffect(() => {
-    persistCollapsedState(isCollapsed);
-  }, [isCollapsed]);
+    const timer = window.setTimeout(() => {
+      setIsCollapsed(readInitialCollapsed(pathname));
+      setHasLoadedCollapsedPreference(true);
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [pathname]);
+
+  useEffect(() => {
+    if (hasLoadedCollapsedPreference) {
+      persistCollapsedState(isCollapsed);
+    }
+  }, [hasLoadedCollapsedPreference, isCollapsed]);
 
   useEffect(() => {
     const handleCollapseRequest = () => setIsCollapsed(true);
@@ -210,14 +313,17 @@ export default function Sidebar() {
 
   useEffect(() => {
     if (!isUserMenuOpen || !user) return;
-    setProfileNameDraft(user.name || user.email || user.username || '');
-    setProfileAvatarDraft(user.avatar || '');
-    setProfileAvatarSource(isImageAvatar(user.avatar) ? user.avatar || '' : '');
-    setProfileAvatarScale(1);
-    setProfileAvatarOffsetX(50);
-    setProfileAvatarOffsetY(50);
-    setProfileNotice('');
-    setAccountNotice('');
+    const timer = window.setTimeout(() => {
+      setProfileNameDraft(user.name || user.email || user.username || '');
+      setProfileAvatarDraft(user.avatar || '');
+      setProfileAvatarSource(isImageAvatar(user.avatar) ? user.avatar || '' : '');
+      setProfileAvatarScale(1);
+      setProfileAvatarOffsetX(50);
+      setProfileAvatarOffsetY(50);
+      setProfileNotice('');
+      setAccountNotice('');
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [isUserMenuOpen, user]);
 
   const filteredConversations = useMemo(() => {
@@ -235,6 +341,33 @@ export default function Sidebar() {
     });
   }, [conversations, searchValue]);
 
+  const conversationTree = useMemo(() => {
+    const projectMap = new Map<string, AgentLocalConversation[]>();
+    const singles: AgentLocalConversation[] = [];
+    filteredConversations.forEach((conversation) => {
+      const personaRecordId = conversation.source_persona_record_id;
+      if (!personaRecordId || !isPersonaProjectConversation(conversation)) {
+        singles.push(conversation);
+        return;
+      }
+      projectMap.set(personaRecordId, [...(projectMap.get(personaRecordId) || []), conversation]);
+    });
+
+    const projects = Array.from(projectMap.entries()).map(([personaRecordId, items]) => {
+      const root =
+        items.find(isPersonaProjectRoot)
+        || items.find((item) => !item.summary.trending.done && !item.summary.content.done)
+        || items[0];
+      const children = items.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
+      const active = items.some((item) => item.local_id === activeConversationId);
+      return { personaRecordId, root, children, active };
+    });
+
+    projects.sort((a, b) => new Date(b.root.updated_at).getTime() - new Date(a.root.updated_at).getTime());
+    singles.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
+    return { projects, singles };
+  }, [activeConversationId, filteredConversations]);
+
   const titleText = status === 'loading' ? '读取中' : isAuthenticated ? user?.name || user?.email || user?.username || '已登录' : '未登录';
   const currentAccountId = getAccountId(user);
   const hasReachedAccountLimit = knownAccounts.length >= 5;
@@ -243,13 +376,13 @@ export default function Sidebar() {
     setIsCollapsed((current) => (typeof nextValue === 'function' ? nextValue(current) : nextValue));
   };
 
-  const handleCreateConversation = () => {
+  const handleCreateConversation = async () => {
     setSidebarNotice('');
     if (status === 'loading') {
       setSidebarNotice('正在确认登录状态，请稍等。');
       return;
     }
-    if (!canCreateNextConversation(conversations, activeConversationId)) {
+    if (!isAuthenticated && !canCreateNextConversation(conversations, activeConversationId)) {
       setSidebarNotice('请先完成当前人设打造，再新建下一个角色对话。');
       if (activeConversationId) {
         window.dispatchEvent(new CustomEvent(AGENT_CHAT_SELECT_CONVERSATION_EVENT, { detail: { localId: activeConversationId } }));
@@ -268,10 +401,100 @@ export default function Sidebar() {
       });
       return;
     }
-    const conversation = createAndStoreConversation();
-    window.dispatchEvent(new CustomEvent(AGENT_CHAT_CREATE_CONVERSATION_EVENT, { detail: { localId: conversation.local_id } }));
-    if (pathname !== '/') {
-      window.location.href = '/';
+    try {
+      const response = await fetch(`${API_BASE}/api/agent/conversations`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      const result = await readJsonResponse(response);
+      if (!response.ok || !isRecord(result) || typeof result.conversation_id !== 'string') {
+        throw new Error('新建对话失败');
+      }
+      const conversation = normalizeBackendConversation(result as Parameters<typeof normalizeBackendConversation>[0]);
+      const conversationId = conversation.local_id;
+      if (!isAuthenticated) {
+        upsertLocalConversation(conversation);
+      }
+      setActiveConversationId(conversationId);
+      writeActiveConversationId(conversationId);
+      window.dispatchEvent(new CustomEvent(AGENT_CHAT_CREATE_CONVERSATION_EVENT, { detail: { localId: conversationId } }));
+      syncConversations();
+      if (pathname !== '/') {
+        window.location.assign('/');
+      }
+    } catch {
+      setSidebarNotice('新对话暂时没有创建成功，请稍后再试一次。');
+    }
+  };
+
+  const handleCreateProjectChild = async (personaRecordId: string) => {
+    setSidebarNotice('');
+    if (!isAuthenticated) {
+      openUnlockDialog({
+        title: '登录后新建内容对话',
+        descriptionLines: ['保存好人设后，可以在同一个人设项目下继续做热门追踪和内容撰写。'],
+        redirectTo: '/',
+        closeRedirectTo: '/',
+      });
+      return;
+    }
+    setCreatingProjectId(personaRecordId);
+    try {
+      const response = await fetch(`${API_BASE}/api/agent/conversations/from-persona`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ persona_record_id: personaRecordId }),
+      });
+      const result = await readJsonResponse(response);
+      if (!response.ok || !isRecord(result) || typeof result.conversation_id !== 'string') {
+        throw new Error('新建内容对话失败');
+      }
+      const conversationId = result.conversation_id;
+      setActiveConversationId(conversationId);
+      writeActiveConversationId(conversationId);
+      syncConversations();
+      window.dispatchEvent(new CustomEvent(AGENT_CHAT_SELECT_CONVERSATION_EVENT, { detail: { localId: conversationId } }));
+      if (pathname !== '/') {
+        window.location.assign('/');
+      }
+    } catch (error) {
+      setSidebarNotice(error instanceof Error && error.message !== 'Failed to fetch' ? error.message : '新建内容对话暂时没有成功，请稍后再试一次。');
+    } finally {
+      setCreatingProjectId('');
+    }
+  };
+
+  const handleDeleteProject = async (personaRecordId: string, title: string) => {
+    setSidebarNotice('');
+    const confirmed = window.confirm(`确定删除「${title}」吗？这会同时删除这个项目下的内容对话。`);
+    if (!confirmed) return;
+    const projectConversationIds = conversations
+      .filter((conversation) => conversation.source_persona_record_id === personaRecordId)
+      .map((conversation) => conversation.local_id);
+    const wasActive = projectConversationIds.includes(activeConversationId);
+    setDeletingConversationId(personaRecordId);
+    if (wasActive) {
+      setActiveConversationId('');
+      writeActiveConversationId('');
+      window.dispatchEvent(new CustomEvent(AGENT_CHAT_SELECT_CONVERSATION_EVENT, { detail: { localId: '' } }));
+    }
+    setConversations((items) => items.filter((item) => item.source_persona_record_id !== personaRecordId));
+    try {
+      const response = await fetch(`${API_BASE}/api/persona/record/${encodeURIComponent(personaRecordId)}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      const result = await readJsonResponse(response);
+      if (!response.ok || !isRecord(result) || result.code !== 200) {
+        throw new Error('删除项目失败');
+      }
+      syncConversations();
+    } catch (error) {
+      setSidebarNotice(error instanceof Error ? error.message : '删除项目暂时没有成功，请稍后再试一次。');
+      syncConversations();
+    } finally {
+      setDeletingConversationId('');
     }
   };
 
@@ -281,7 +504,7 @@ export default function Sidebar() {
     writeActiveConversationId(localId);
     window.dispatchEvent(new CustomEvent(AGENT_CHAT_SELECT_CONVERSATION_EVENT, { detail: { localId } }));
     if (pathname !== '/') {
-      window.location.href = '/';
+      window.location.assign('/');
     }
   };
 
@@ -333,7 +556,15 @@ export default function Sidebar() {
     setSidebarNotice('');
     const confirmed = window.confirm(`确定删除「${getConversationTitle(conversation)}」吗？`);
     if (!confirmed) return;
+    const wasActive = conversation.local_id === activeConversationId;
+    setDeletingConversationId(conversation.local_id);
     deleteLocalConversation(conversation.local_id);
+    setConversations((items) => items.filter((item) => item.local_id !== conversation.local_id));
+    if (wasActive) {
+      setActiveConversationId('');
+      writeActiveConversationId('');
+      window.dispatchEvent(new CustomEvent(AGENT_CHAT_SELECT_CONVERSATION_EVENT, { detail: { localId: '' } }));
+    }
     if (isAuthenticated && conversation.conversation_id) {
       try {
         const response = await fetch(`${API_BASE}/api/agent/conversations/${conversation.conversation_id}`, {
@@ -344,11 +575,21 @@ export default function Sidebar() {
           const payload = await readJsonResponse(response).catch(() => ({}));
           const message = typeof (payload as { message?: unknown }).message === 'string' ? (payload as { message: string }).message : '后端删除失败';
           setSidebarNotice(message);
+        } else {
+          if (wasActive) {
+            writeActiveConversationId('');
+            window.dispatchEvent(new CustomEvent(AGENT_CHAT_SELECT_CONVERSATION_EVENT, { detail: { localId: '' } }));
+          }
+          syncConversations();
         }
       } catch {
         setSidebarNotice('本地已删除，后端服务连接失败。');
+      } finally {
+        setDeletingConversationId('');
       }
+      return;
     }
+    setDeletingConversationId('');
   };
 
   const handleSwitchKnownAccount = async (accountId: string) => {
@@ -359,7 +600,7 @@ export default function Sidebar() {
       await switchKnownAccount(accountId);
       setIsUserMenuOpen(false);
       if (pathname !== '/') {
-        window.location.href = '/';
+        window.location.assign('/');
       }
     } catch (error) {
       setAccountNotice(error instanceof Error ? error.message : '切换账号失败');
@@ -444,7 +685,91 @@ export default function Sidebar() {
         <div className="mt-5 min-h-0 flex-1 overflow-y-auto">
           {!isCollapsed && <p className="px-3 text-[12px] font-medium text-[var(--muted-text)]">对话</p>}
           <div className="mt-2 space-y-1">
-            {filteredConversations.map((conversation) => {
+            {conversationTree.projects.map((project) => {
+              const rootTitle = getProjectTitle(project.root);
+              return (
+                <div key={project.personaRecordId} className="space-y-1">
+                  <div
+                    className={`group flex w-full items-center gap-1 rounded-[14px] transition ${
+                      project.active ? 'bg-[var(--nav-active)] text-[var(--foreground)]' : 'text-[var(--foreground)] hover:bg-[var(--nav-hover)]'
+                    } ${isCollapsed ? 'justify-center' : ''}`}
+                  >
+                    <div
+                      title={isCollapsed ? rootTitle : undefined}
+                      className={`flex min-w-0 flex-1 items-center gap-3 px-3 py-2.5 text-left ${isCollapsed ? 'justify-center' : ''}`}
+                    >
+                      <span className="grid size-8 shrink-0 place-items-center rounded-full bg-white text-[12px] font-bold shadow-[var(--box-shadow)]">P</span>
+                      {!isCollapsed && (
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-[14px] font-semibold text-[var(--foreground)]">{rootTitle}</span>
+                        </span>
+                      )}
+                    </div>
+                    {!isCollapsed && (
+                      <>
+                        <button
+                          type="button"
+                          disabled={creatingProjectId === project.personaRecordId}
+                          onClick={() => void handleCreateProjectChild(project.personaRecordId)}
+                          title="新建内容对话"
+                          aria-label={`在 ${rootTitle} 下新建内容对话`}
+                          className="grid size-8 shrink-0 place-items-center rounded-full text-[15px] text-[var(--muted-text)] opacity-70 transition hover:bg-white hover:text-[#2563eb] disabled:cursor-not-allowed disabled:opacity-40 group-hover:opacity-100"
+                        >
+                          +
+                        </button>
+                        <button
+                          type="button"
+                          disabled={deletingConversationId === project.personaRecordId}
+                          onClick={() => void handleDeleteProject(project.personaRecordId, rootTitle)}
+                          title="删除项目"
+                          aria-label={`删除 ${rootTitle}`}
+                          className="mr-2 grid size-8 shrink-0 place-items-center rounded-full text-[15px] text-[var(--muted-text)] opacity-70 transition hover:bg-white hover:text-[#dc2626] disabled:cursor-not-allowed disabled:opacity-40 group-hover:opacity-100"
+                        >
+                          x
+                        </button>
+                      </>
+                    )}
+                  </div>
+
+                  {!isCollapsed && project.children.map((conversation) => {
+                    const active = conversation.local_id === activeConversationId;
+                    return (
+                      <div
+                        key={conversation.local_id}
+                        className={`group ml-7 flex items-center gap-2 rounded-[14px] transition ${
+                          active ? 'bg-[var(--nav-active)] text-[var(--foreground)]' : 'text-[var(--foreground)] hover:bg-[var(--nav-hover)]'
+                        }`}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => handleSelectConversation(conversation.local_id)}
+                          className="flex min-w-0 flex-1 items-center gap-2 px-3 py-2.5 text-left"
+                        >
+                          <span className="grid size-6 shrink-0 place-items-center rounded-full bg-white text-[12px] shadow-[var(--box-shadow)]">
+                            {conversation.summary.content.done ? 'C' : conversation.summary.trending.done ? 'T' : 'N'}
+                          </span>
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-[13px] font-medium">{getConversationTitle(conversation)}</span>
+                          </span>
+                        </button>
+                        <button
+                          type="button"
+                          disabled={deletingConversationId === conversation.local_id}
+                          onClick={() => void handleDeleteConversation(conversation)}
+                          title="删除"
+                          aria-label={`删除 ${getConversationTitle(conversation)}`}
+                          className="mr-2 grid size-8 shrink-0 place-items-center rounded-full text-[15px] text-[var(--muted-text)] opacity-70 transition hover:bg-white hover:text-[#dc2626] disabled:cursor-not-allowed disabled:opacity-40 group-hover:opacity-100"
+                        >
+                          x
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })}
+
+            {conversationTree.singles.map((conversation) => {
               const active = conversation.local_id === activeConversationId;
               return (
                 <div
@@ -460,32 +785,30 @@ export default function Sidebar() {
                     className={`flex min-w-0 flex-1 items-center gap-3 px-3 py-2.5 text-left ${isCollapsed ? 'justify-center' : ''}`}
                   >
                     <span className="grid size-8 shrink-0 place-items-center rounded-full bg-white text-[14px] shadow-[var(--box-shadow)]">
-                      {conversation.summary.content.done ? '✓' : conversation.summary.persona.done ? '•' : '·'}
+                      {conversation.summary.content.done ? 'C' : conversation.summary.persona.done ? 'P' : 'N'}
                     </span>
                     {!isCollapsed && (
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-[14px] font-medium">{getConversationTitle(conversation)}</span>
-                        <span className="mt-0.5 block truncate text-[12px] text-[var(--muted-text)]">
-                          {compactConversationMeta(conversation)}
-                        </span>
                       </span>
                     )}
                   </button>
                   {!isCollapsed && (
                     <button
                       type="button"
+                      disabled={deletingConversationId === conversation.local_id}
                       onClick={() => void handleDeleteConversation(conversation)}
                       title="删除"
                       aria-label={`删除 ${getConversationTitle(conversation)}`}
-                      className="mr-2 grid size-8 shrink-0 place-items-center rounded-full text-[15px] text-[var(--muted-text)] opacity-70 transition hover:bg-white hover:text-[#dc2626] group-hover:opacity-100"
+                      className="mr-2 grid size-8 shrink-0 place-items-center rounded-full text-[15px] text-[var(--muted-text)] opacity-70 transition hover:bg-white hover:text-[#dc2626] disabled:cursor-not-allowed disabled:opacity-40 group-hover:opacity-100"
                     >
-                      🗑
+                      x
                     </button>
                   )}
                 </div>
               );
             })}
-            {!isCollapsed && filteredConversations.length === 0 && (
+            {!isCollapsed && conversationTree.projects.length === 0 && conversationTree.singles.length === 0 && (
               <p className="rounded-[14px] px-3 py-4 text-[13px] leading-6 text-[var(--muted-text)]">
                 还没有对话，点击“新建对话”开始。
               </p>
@@ -496,7 +819,7 @@ export default function Sidebar() {
 
       <div ref={userModuleRef} className={`relative z-40 shrink-0 border-t border-[var(--box-border)] px-3 py-4 ${isCollapsed ? 'space-y-3' : 'space-y-2'}`}>
         {isAuthenticated && isUserMenuOpen && (
-          <div className={`fixed z-50 max-h-[calc(100vh-316px)] w-[380px] max-w-[calc(100vw-32px)] overflow-y-auto rounded-[18px] border border-[var(--box-border)] bg-white p-3 text-sm text-[var(--foreground)] shadow-[var(--box-shadow)] ${isCollapsed ? 'bottom-3 left-[104px]' : 'left-[60px] top-[292px]'}`}>
+          <div className={`fixed z-50 max-h-[calc(100vh-316px)] w-[320px] max-w-[calc(100vw-32px)] overflow-y-auto rounded-[18px] border border-[var(--box-border)] bg-white p-3 text-sm text-[var(--foreground)] shadow-[var(--box-shadow)] sm:w-[340px] ${isCollapsed ? 'bottom-3 left-[96px]' : 'left-[28px] top-[292px]'}`}>
             <div className="flex items-center gap-3">
               <AvatarBadge value={profileAvatarDraft} size="lg" />
               <div className="min-w-0">

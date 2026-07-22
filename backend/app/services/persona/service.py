@@ -3,6 +3,7 @@ from ...adapters.agent.builder import ContextBuilder
 from ...adapters.agent.options import build_agent_options
 from ...schemas.agent.protocol import AgentRunRequest
 from ...database.crud.persona_crud import PersonaCRUD
+from ...database.crud.memory_crud import MemoryCRUD
 from ...services.memory import RollingMemoryService
 from ...services.agent_debug import build_agent_debug_payload, build_agent_option_overrides
 from typing import Any, Dict
@@ -15,6 +16,7 @@ class PersonaService:
         self.client = AgentClient()
         self.builder = ContextBuilder(db)
         self.persona_crud = PersonaCRUD()
+        self.memory_crud = MemoryCRUD()
         self.memory_service = RollingMemoryService()
 
     async def analyze(
@@ -23,6 +25,7 @@ class PersonaService:
         basic_info: dict,
         persist: bool = True,
         agent_debug: dict | None = None,
+        prompt_override: str = None,
     ) -> dict:
         if not basic_info or not any(basic_info.values()):
             return {"status": "failed", "message": "basicInfo不能为空，至少提供一项信息"}
@@ -42,6 +45,7 @@ class PersonaService:
             options=build_agent_options(
                 enableTools=False,
                 forceStructuredPersona=True,
+                promptOverride=prompt_override,
                 **build_agent_option_overrides(agent_debug),
             ),
         )
@@ -106,7 +110,13 @@ class PersonaService:
         return self.persona_crud.set_persona_favorite(user_id, record_id, is_favorited) or {}
 
     def delete_persona_record(self, user_id: str, record_id: str) -> bool:
-        return self.persona_crud.delete_persona_record(user_id, record_id)
+        deleted = self.persona_crud.delete_persona_record(user_id, record_id)
+        if deleted:
+            try:
+                self.memory_crud.delete_agent_chat_conversations_by_persona_record(user_id, record_id)
+            except Exception:
+                pass
+        return deleted
 
     async def follow_up(
         self,

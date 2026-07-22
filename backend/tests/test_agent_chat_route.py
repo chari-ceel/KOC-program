@@ -45,6 +45,8 @@ def test_agent_chat_route_uses_demo_user_without_login(monkeypatch):
     assert response.json()["conversation_id"] == "conv_001"
     assert captured["user_id"] == "demo-user"
     assert captured["message"] == "我是美妆博主"
+    assert captured["action_type"] == "message"
+    assert captured["action_payload"] == {}
 
 
 def test_agent_chat_route_prefers_logged_in_user(monkeypatch):
@@ -77,6 +79,8 @@ def test_agent_chat_route_prefers_logged_in_user(monkeypatch):
             "current_step": "trending",
             "selected_persona_id": "persona_001",
             "selected_topic_id": "topic_001",
+            "action_type": "save",
+            "action_payload": {"step": "trending"},
             "expose_debug": True,
         },
     )
@@ -86,6 +90,8 @@ def test_agent_chat_route_prefers_logged_in_user(monkeypatch):
     assert captured["conversation_id"] == "conv_abc"
     assert captured["selected_persona_id"] == "persona_001"
     assert captured["selected_topic_id"] == "topic_001"
+    assert captured["action_type"] == "save"
+    assert captured["action_payload"] == {"step": "trending"}
     assert captured["expose_debug"] is True
 
 
@@ -115,6 +121,74 @@ def test_agent_chat_conversations_route_uses_logged_in_user(monkeypatch):
     assert response.status_code == 200
     assert response.json()["conversations"][0]["title"] == "平价美妆测评"
     assert captured == {"user_id": "session-user", "limit": 20}
+
+
+def test_agent_chat_create_conversation_route_returns_starter_questions(monkeypatch):
+    captured = {}
+    background_calls = []
+
+    def fake_create_conversation(**kwargs):
+        captured.update(kwargs)
+        return {
+            "conversation_id": "conv_new",
+            "conversation_title": "新建对话",
+            "current_step": "persona",
+            "messages": [
+                {
+                    "id": "msg_welcome",
+                    "role": "assistant",
+                    "content": "欢迎",
+                    "step": "persona",
+                    "created_at": "2026-07-20T10:30:00+08:00",
+                    "question_blocks": [{"id": "persona_starter_1", "question": "你现在是什么身份或阶段？", "examples": []}],
+                }
+            ],
+            "summary": {},
+            "memory_refs": {},
+            "question_blocks": [{"id": "persona_starter_1", "question": "你现在是什么身份或阶段？", "examples": []}],
+            "create_status": "ready",
+            "actions": [],
+        }
+
+    async def fake_generate_initial_persona_questions(**kwargs):
+        background_calls.append(kwargs)
+
+    app.dependency_overrides[get_current_user] = lambda: AuthenticatedUser(user_id="session-user", username="tester")
+    monkeypatch.setattr(agent_chat_endpoint.service, "create_conversation", fake_create_conversation)
+    monkeypatch.setattr(agent_chat_endpoint.service, "generate_initial_persona_questions", fake_generate_initial_persona_questions)
+
+    response = client.post("/api/agent/conversations")
+
+    assert response.status_code == 200
+    assert response.json()["conversation_id"] == "conv_new"
+    assert response.json()["question_blocks"][0]["question"] == "你现在是什么身份或阶段？"
+    assert response.json()["create_status"] == "ready"
+    assert captured == {"user_id": "session-user"}
+    assert background_calls == []
+
+
+def test_agent_chat_conversation_from_persona_route(monkeypatch):
+    captured = {}
+
+    def fake_start_conversation_from_persona(**kwargs):
+        captured.update(kwargs)
+        return {
+            "conversation_id": "conv_persona",
+            "conversation_title": "新人职场日记",
+            "current_step": "trending",
+            "messages": [],
+            "summary": {},
+            "memory_refs": {},
+        }
+
+    app.dependency_overrides[get_current_user] = lambda: AuthenticatedUser(user_id="session-user", username="tester")
+    monkeypatch.setattr(agent_chat_endpoint.service, "start_conversation_from_persona", fake_start_conversation_from_persona)
+
+    response = client.post("/api/agent/conversations/from-persona", json={"persona_record_id": "persona_record_1"})
+
+    assert response.status_code == 200
+    assert response.json()["conversation_id"] == "conv_persona"
+    assert captured == {"user_id": "session-user", "persona_record_id": "persona_record_1"}
 
 
 def test_agent_chat_conversation_detail_route_returns_history(monkeypatch):
