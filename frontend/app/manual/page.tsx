@@ -35,10 +35,10 @@ export default function ManualPage() {
         </ul>
       </section>
       <Link
-        href="/"
+        href="/chat"
         className="koc-heading-font fixed bottom-[max(24px,env(safe-area-inset-bottom))] right-6 z-40 rounded-full bg-[var(--primary)] px-5 py-3 text-[15px] text-white shadow-[var(--cta-shadow)] transition hover:bg-[var(--primary-hover)]"
       >
-        进入主页面
+        进入主对话
       </Link>
     </main>
   );

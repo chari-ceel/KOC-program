@@ -620,6 +620,156 @@ input[type="password"]::-ms-clear {
   animation: koc-home-wave 2.8s ease-in-out infinite;
 }
 
+.koc-chat-robot {
+  position: relative;
+  z-index: 6;
+  width: 112px;
+  height: 112px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  overflow: visible;
+  pointer-events: auto;
+  transform-origin: 50% 100%;
+  transition:
+    transform 0.42s cubic-bezier(0.2, 0.84, 0.22, 1);
+}
+
+.koc-chat-robot-svg {
+  display: block;
+  pointer-events: none;
+  transform-origin: 50% 100%;
+  transition: transform 0.42s cubic-bezier(0.2, 0.84, 0.22, 1);
+}
+
+.koc-chat-robot .koc-robot-pose {
+  animation: koc-chat-robot-perch 4.8s ease-in-out infinite;
+}
+
+.koc-chat-robot-grip {
+  position: absolute;
+  bottom: -1px;
+  z-index: 2;
+  width: 28px;
+  height: 18px;
+  border: 2px solid #cbd5e1;
+  border-top-color: #f8fbff;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #ffffff 0%, #eef4ff 100%);
+  box-shadow: 0 5px 10px rgba(15, 23, 42, 0.12);
+  transition:
+    opacity 0.22s ease,
+    transform 0.34s cubic-bezier(0.2, 0.84, 0.22, 1);
+}
+
+.koc-chat-robot-grip-left {
+  left: 28px;
+  transform: rotate(-9deg);
+}
+
+.koc-chat-robot-grip-right {
+  right: 28px;
+  transform: rotate(9deg);
+}
+
+.koc-chat-robot-sleep-eye {
+  opacity: 0;
+  transition: opacity 0.22s ease;
+}
+
+.koc-chat-robot:not(.koc-chat-robot--walk) .koc-robot-body,
+.koc-chat-robot:not(.koc-chat-robot--walk) .koc-robot-body-highlight,
+.koc-chat-robot:not(.koc-chat-robot--walk) .koc-robot-leg,
+.koc-chat-robot:not(.koc-chat-robot--walk) .koc-robot-shadow {
+  opacity: 0;
+  transform: translate3d(0, 16px, 0) scaleY(0.78);
+}
+
+.koc-chat-robot:not(.koc-chat-robot--walk) .koc-chat-robot-svg {
+  transform: translate3d(0, 14px, 0) scale(0.94);
+}
+
+.koc-chat-robot:not(.koc-chat-robot--walk) .koc-robot-left-arm {
+  transform: translate3d(18px, -19px, 0) rotate(38deg);
+}
+
+.koc-chat-robot:not(.koc-chat-robot--walk) .koc-robot-right-arm {
+  transform: translate3d(-18px, -19px, 0) rotate(-38deg);
+}
+
+.koc-chat-robot--sleep .koc-chat-robot-svg {
+  transform: translate3d(0, 17px, 0) rotate(-3deg) scale(0.92);
+}
+
+.koc-chat-robot--sleep .koc-robot-pose {
+  animation: koc-chat-robot-sleep-breathe 4.2s ease-in-out infinite;
+}
+
+.koc-chat-robot--sleep .koc-robot-head {
+  transform: translate3d(0, 20px, 0) rotate(5deg);
+}
+
+.koc-chat-robot--sleep .koc-robot-body,
+.koc-chat-robot--sleep .koc-robot-body-highlight,
+.koc-chat-robot--sleep .koc-robot-leg,
+.koc-chat-robot--sleep .koc-robot-shadow {
+  opacity: 0;
+  transform: translate3d(0, 18px, 0) scaleY(0.78);
+}
+
+.koc-chat-robot--sleep .koc-robot-left-arm {
+  transform: translate3d(22px, -27px, 0) rotate(44deg);
+}
+
+.koc-chat-robot--sleep .koc-robot-right-arm {
+  transform: translate3d(-22px, -27px, 0) rotate(-44deg);
+}
+
+.koc-chat-robot--sleep .koc-robot-eye {
+  opacity: 0;
+  animation: none;
+}
+
+.koc-chat-robot--sleep .koc-chat-robot-sleep-eye,
+.koc-chat-robot--sleep .koc-robot-blush {
+  opacity: 1;
+}
+
+.koc-chat-robot--look .koc-robot-head {
+  transform: translate3d(0, 7px, 0) rotate(7deg);
+}
+
+.koc-chat-robot--look .koc-robot-eye {
+  animation: none;
+  transform: translate3d(0, 9px, 0) scaleY(0.84);
+}
+
+.koc-chat-robot--walk {
+  animation: koc-chat-robot-walk 7.6s ease-in-out both;
+}
+
+.koc-chat-robot--walk .koc-chat-robot-svg {
+  transform: translate3d(0, 8px, 0) scale(1);
+}
+
+.koc-chat-robot--walk .koc-robot-body,
+.koc-chat-robot--walk .koc-robot-body-highlight,
+.koc-chat-robot--walk .koc-robot-leg,
+.koc-chat-robot--walk .koc-robot-shadow {
+  opacity: 1;
+  transform: none;
+}
+
+.koc-chat-robot--walk .koc-robot-pose {
+  animation: koc-chat-robot-step 0.52s ease-in-out infinite;
+}
+
+.koc-chat-robot--walk .koc-chat-robot-grip {
+  opacity: 0;
+  transform: translate3d(0, 18px, 0) scale(0.72);
+}
+
 .koc-shell-box {
   border: 1px solid var(--box-border);
   box-shadow: var(--box-shadow);
@@ -962,6 +1112,58 @@ img[src*="koc-assets%2Ficons"] {
   }
 }
 
+@keyframes koc-chat-robot-perch {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) rotate(0deg);
+  }
+
+  50% {
+    transform: translate3d(0, -3px, 0) rotate(-1deg);
+  }
+}
+
+@keyframes koc-chat-robot-sleep-breathe {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+
+  50% {
+    transform: translate3d(0, 2px, 0) scale(1.01, 0.99);
+  }
+}
+
+@keyframes koc-chat-robot-step {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) rotate(-1deg);
+  }
+
+  50% {
+    transform: translate3d(0, -5px, 0) rotate(1deg);
+  }
+}
+
+@keyframes koc-chat-robot-walk {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+
+  24% {
+    transform: translate3d(-170px, -2px, 0);
+  }
+
+  52% {
+    transform: translate3d(-380px, 0, 0);
+  }
+
+  76% {
+    transform: translate3d(-190px, -2px, 0);
+  }
+}
+
 @keyframes koc-home-glitter-fall {
   0% {
     opacity: 0;
@@ -1170,16 +1372,72 @@ img[src*="koc-assets%2Ficons"] {
   .koc-robot-arm,
   .koc-robot-leg,
   .koc-robot-eye,
-  .koc-robot-wave {
+  .koc-robot-wave,
+  .koc-chat-robot,
+  .koc-chat-robot-svg,
+  .koc-chat-robot-grip {
     animation: none;
     opacity: 1;
     transform: none;
     transition: none;
   }
+
+  .koc-chat-robot:not(.koc-chat-robot--walk) .koc-robot-body,
+  .koc-chat-robot:not(.koc-chat-robot--walk) .koc-robot-body-highlight,
+  .koc-chat-robot:not(.koc-chat-robot--walk) .koc-robot-leg,
+  .koc-chat-robot:not(.koc-chat-robot--walk) .koc-robot-shadow {
+    opacity: 0;
+  }
+
+  .koc-chat-robot:not(.koc-chat-robot--walk) .koc-chat-robot-svg {
+    transform: translate3d(0, 14px, 0) scale(0.94);
+  }
+
+  .koc-chat-robot--sleep .koc-chat-robot-svg {
+    transform: translate3d(0, 17px, 0) rotate(-3deg) scale(0.92);
+  }
+
+  .koc-chat-robot--sleep .koc-robot-head {
+    transform: translate3d(0, 20px, 0) rotate(5deg);
+  }
+
+  .koc-chat-robot--look .koc-robot-head {
+    transform: translate3d(0, 7px, 0) rotate(7deg);
+  }
+
+  .koc-chat-robot--walk .koc-chat-robot-svg {
+    transform: translate3d(0, 8px, 0) scale(1);
+  }
 }
 
 ::selection {
   background: rgba(222, 134, 143, 0.22);
+}
+
+@media (max-width: 760px) {
+  .koc-chat-robot {
+    width: 74px;
+    height: 74px;
+  }
+
+  .koc-chat-robot--walk {
+    animation-name: koc-chat-robot-walk-mobile;
+  }
+}
+
+@keyframes koc-chat-robot-walk-mobile {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+
+  34% {
+    transform: translate3d(-96px, -2px, 0);
+  }
+
+  68% {
+    transform: translate3d(-38px, 0, 0);
+  }
 }
 
 ::-webkit-scrollbar {

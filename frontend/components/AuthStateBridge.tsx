@@ -4,6 +4,7 @@ import { useEffect, useRef } from 'react';
 import { useAppState } from '@/context/AppStateContext';
 import { useAuth } from '@/context/AuthContext';
 import { PERSONA_STORAGE_KEY } from '@/lib/persona';
+import { clearAgentChatScopeData } from '@/lib/agent-chat-store';
 
 const SESSION_KEYS_TO_CLEAR = [
   'koc-agent-profile-chat-state',
@@ -26,6 +27,9 @@ export default function AuthStateBridge() {
   useEffect(() => {
     const previousStatus = previousStatusRef.current;
     previousStatusRef.current = status;
+    if (status === 'anonymous') {
+      clearAgentChatScopeData(null);
+    }
     if (previousStatus !== 'authenticated' || status !== 'anonymous') return;
 
     dispatch({ type: 'CLEAR_PERSONA' });

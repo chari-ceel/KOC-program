@@ -99,9 +99,11 @@ export function clearAgentChatScopeData(accountId?: string | null) {
   const scope = normalizeScope(accountId);
   window.localStorage.removeItem(scopedStorageKey(AGENT_CHAT_CONVERSATIONS_STORAGE_KEY, scope));
   window.localStorage.removeItem(scopedStorageKey(AGENT_CHAT_ACTIVE_CONVERSATION_STORAGE_KEY, scope));
-  if (scope === readAgentChatAccountScope()) {
-    emitConversationsUpdated();
+  if (scope === DEFAULT_ACCOUNT_SCOPE) {
+    window.localStorage.removeItem(AGENT_CHAT_CONVERSATIONS_STORAGE_KEY);
+    window.localStorage.removeItem(AGENT_CHAT_ACTIVE_CONVERSATION_STORAGE_KEY);
   }
+  emitConversationsUpdated();
 }
 
 export function createEmptyConversation(index = 1): AgentLocalConversation {

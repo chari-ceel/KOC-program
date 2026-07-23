@@ -520,6 +520,166 @@ function AgentActionButtons({
   );
 }
 
+function ChatPerchedRobot({ loading }: { loading: boolean }) {
+  const [pose, setPose] = useState<'idle' | 'sleep' | 'look'>('idle');
+  const [isWalking, setIsWalking] = useState(false);
+  const hadLoadingRef = useRef(false);
+  const lookTimerRef = useRef<number | null>(null);
+  const walkTimerRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (isWalking) return;
+    if (lookTimerRef.current) {
+      window.clearTimeout(lookTimerRef.current);
+      lookTimerRef.current = null;
+    }
+    if (loading) {
+      hadLoadingRef.current = true;
+      setPose('sleep');
+      return;
+    }
+    if (hadLoadingRef.current) {
+      setPose('look');
+      lookTimerRef.current = window.setTimeout(() => {
+        setPose('idle');
+        hadLoadingRef.current = false;
+        lookTimerRef.current = null;
+      }, 5000);
+      return;
+    }
+    setPose('idle');
+    return () => {
+      if (lookTimerRef.current) {
+        window.clearTimeout(lookTimerRef.current);
+        lookTimerRef.current = null;
+      }
+    };
+  }, [isWalking, loading]);
+
+  useEffect(() => () => {
+    if (lookTimerRef.current) window.clearTimeout(lookTimerRef.current);
+    if (walkTimerRef.current) window.clearTimeout(walkTimerRef.current);
+  }, []);
+
+  const handleRobotClick = () => {
+    if (walkTimerRef.current) window.clearTimeout(walkTimerRef.current);
+    if (lookTimerRef.current) {
+      window.clearTimeout(lookTimerRef.current);
+      lookTimerRef.current = null;
+    }
+    setPose('idle');
+    setIsWalking(true);
+    walkTimerRef.current = window.setTimeout(() => {
+      setIsWalking(false);
+      walkTimerRef.current = null;
+      if (loading) setPose('sleep');
+      else {
+        setPose('idle');
+        hadLoadingRef.current = false;
+      }
+    }, 7600);
+  };
+
+  return (
+    <button
+      type="button"
+      aria-label="小猪梨散步"
+      title="小猪梨散步"
+      onClick={handleRobotClick}
+      className={`koc-chat-robot koc-chat-robot--${pose} ${isWalking ? 'koc-chat-robot--walk' : ''}`}
+    >
+      <span className="koc-chat-robot-grip koc-chat-robot-grip-left" />
+      <span className="koc-chat-robot-grip koc-chat-robot-grip-right" />
+      <svg
+        viewBox="0 0 260 260"
+        className="koc-chat-robot-svg koc-robot-mascot koc-robot-action-idle h-full w-full drop-shadow-[0_18px_30px_rgba(37,99,235,0.14)]"
+        aria-hidden="true"
+      >
+        <defs>
+          <linearGradient id="chatRobotShell" x1="8%" y1="5%" x2="92%" y2="100%">
+            <stop offset="0%" stopColor="#ffffff" />
+            <stop offset="52%" stopColor="#fffefe" />
+            <stop offset="100%" stopColor="#e8eef9" />
+          </linearGradient>
+          <linearGradient id="chatRobotBlue" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#5dddf5" />
+            <stop offset="54%" stopColor="#20a7dc" />
+            <stop offset="100%" stopColor="#1679c9" />
+          </linearGradient>
+          <linearGradient id="chatRobotScreen" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#ffffff" />
+            <stop offset="62%" stopColor="#fffefe" />
+            <stop offset="100%" stopColor="#eef5ff" />
+          </linearGradient>
+          <radialGradient id="chatRobotSoftHighlight" cx="34%" cy="18%" r="74%">
+            <stop offset="0%" stopColor="#ffffff" stopOpacity="0.95" />
+            <stop offset="58%" stopColor="#ffffff" stopOpacity="0.26" />
+            <stop offset="100%" stopColor="#bfdbfe" stopOpacity="0.1" />
+          </radialGradient>
+          <filter id="chatRobotSoftShadow" x="-20%" y="-20%" width="140%" height="150%">
+            <feDropShadow dx="0" dy="6" stdDeviation="5" floodColor="#64748b" floodOpacity="0.18" />
+          </filter>
+        </defs>
+        <g className="koc-robot-pose" filter="url(#chatRobotSoftShadow)">
+          <ellipse className="koc-robot-shadow" cx="130" cy="238" rx="60" ry="13" fill="rgba(148,163,184,0.18)" />
+          <g className="koc-robot-leg koc-robot-left-leg">
+            <path d="M91 188C84 199 84 219 91 229C98 237 116 237 122 229C124 213 119 197 109 188Z" fill="url(#chatRobotShell)" stroke="#b9c3d3" strokeWidth="2.2" />
+            <ellipse cx="106" cy="229" rx="18" ry="10" fill="#fffefe" stroke="#cdd6e5" strokeWidth="2" />
+          </g>
+          <g className="koc-robot-leg koc-robot-right-leg">
+            <path d="M151 188C141 197 136 213 138 229C144 237 162 237 169 229C176 219 176 199 169 188Z" fill="url(#chatRobotShell)" stroke="#b9c3d3" strokeWidth="2.2" />
+            <ellipse cx="154" cy="229" rx="18" ry="10" fill="#fffefe" stroke="#cdd6e5" strokeWidth="2" />
+          </g>
+          <path className="koc-robot-body" d="M91 153C98 136 112 128 130 128C148 128 162 136 169 153L178 190C182 210 159 222 130 222C101 222 78 210 82 190Z" fill="url(#chatRobotShell)" stroke="#b8c2d1" strokeWidth="2.5" />
+          <path className="koc-robot-body-highlight" d="M96 160C110 169 150 169 164 160" fill="none" stroke="rgba(255,255,255,0.86)" strokeWidth="3.5" strokeLinecap="round" />
+          <g className="koc-robot-arm koc-robot-left-arm">
+            <path d="M91 158C77 164 70 179 72 195C74 210 88 218 98 209C96 192 100 177 109 168Z" fill="url(#chatRobotShell)" stroke="#b9c3d3" strokeWidth="2.3" />
+            <path d="M78 197C82 204 89 207 96 205" fill="none" stroke="#c8d1df" strokeWidth="2" strokeLinecap="round" />
+          </g>
+          <g className="koc-robot-arm koc-robot-right-arm">
+            <path d="M169 158C183 164 190 179 188 195C186 210 172 218 162 209C164 192 160 177 151 168Z" fill="url(#chatRobotShell)" stroke="#b9c3d3" strokeWidth="2.3" />
+            <path d="M182 197C178 204 171 207 164 205" fill="none" stroke="#c8d1df" strokeWidth="2" strokeLinecap="round" />
+          </g>
+          <g className="koc-robot-head" transform="translate(10.4 9) scale(0.92)">
+            <path d="M52 76C57 48 69 27 86 19C100 28 108 48 114 70Z" fill="url(#chatRobotShell)" stroke="#b7c1d0" strokeWidth="2.6" strokeLinejoin="round" />
+            <path d="M208 76C203 48 191 27 174 19C160 28 152 48 146 70Z" fill="url(#chatRobotShell)" stroke="#b7c1d0" strokeWidth="2.6" strokeLinejoin="round" />
+            <path d="M72 65C76 49 82 38 90 32C98 42 103 53 106 67Z" fill="#ffd8df" stroke="#efb6c2" strokeWidth="2" strokeLinejoin="round" />
+            <path d="M188 65C184 49 178 38 170 32C162 42 157 53 154 67Z" fill="#ffd8df" stroke="#efb6c2" strokeWidth="2" strokeLinejoin="round" />
+            <rect x="38" y="60" width="184" height="114" rx="37" fill="url(#chatRobotShell)" stroke="#b4becd" strokeWidth="3" />
+            <rect x="45" y="66" width="170" height="104" rx="33" fill="url(#chatRobotSoftHighlight)" opacity="0.8" />
+            <path d="M54 94C56 73 76 67 101 67H158C188 67 205 80 208 105" fill="none" stroke="rgba(255,255,255,0.82)" strokeWidth="4" strokeLinecap="round" />
+            <path d="M45 107C49 64 82 38 130 38C178 38 211 64 215 107" fill="none" stroke="url(#chatRobotBlue)" strokeWidth="13" strokeLinecap="round" />
+            <path d="M50 111C50 128 39 141 25 139C13 137 10 123 13 104C16 85 28 74 41 77C49 79 50 94 50 111Z" fill="#ffffff" stroke="#b8c2d1" strokeWidth="2.4" />
+            <path d="M32 83C43 84 49 96 49 111C49 127 42 139 29 140" fill="none" stroke="url(#chatRobotBlue)" strokeWidth="13" strokeLinecap="round" />
+            <ellipse cx="29" cy="112" rx="15" ry="28" fill="#f8fbff" stroke="#b8c2d1" strokeWidth="2" opacity="0.9" />
+            <path d="M210 111C210 128 221 141 235 139C247 137 250 123 247 104C244 85 232 74 219 77C211 79 210 94 210 111Z" fill="#ffffff" stroke="#b8c2d1" strokeWidth="2.4" />
+            <path d="M228 83C217 84 211 96 211 111C211 127 218 139 231 140" fill="none" stroke="url(#chatRobotBlue)" strokeWidth="13" strokeLinecap="round" />
+            <ellipse cx="231" cy="112" rx="15" ry="28" fill="#f8fbff" stroke="#b8c2d1" strokeWidth="2" opacity="0.9" />
+            <rect x="62" y="86" width="136" height="70" rx="21" fill="url(#chatRobotScreen)" stroke="#aeb9c9" strokeWidth="3" />
+            <rect x="69" y="92" width="122" height="58" rx="17" fill="none" stroke="rgba(203,213,225,0.42)" strokeWidth="2" />
+            <circle className="koc-robot-screen-dot" cx="184" cy="99" r="4.6" fill="#cbd5e1" />
+            <g className="koc-robot-eye koc-robot-eye-left">
+              <ellipse cx="102" cy="122" rx="11" ry="17" fill="#111827" />
+              <ellipse cx="103" cy="130" rx="10" ry="8" fill="#020617" opacity="0.36" />
+              <circle cx="97" cy="112" r="4.8" fill="#ffffff" />
+            </g>
+            <g className="koc-robot-eye koc-robot-eye-right">
+              <ellipse cx="159" cy="122" rx="11" ry="17" fill="#111827" />
+              <ellipse cx="160" cy="130" rx="10" ry="8" fill="#020617" opacity="0.36" />
+              <circle cx="154" cy="112" r="4.8" fill="#ffffff" />
+            </g>
+            <path className="koc-chat-robot-sleep-eye koc-chat-robot-sleep-eye-left" d="M88 121C96 127 107 127 115 121" fill="none" stroke="#111827" strokeWidth="5" strokeLinecap="round" />
+            <path className="koc-chat-robot-sleep-eye koc-chat-robot-sleep-eye-right" d="M145 121C153 127 164 127 172 121" fill="none" stroke="#111827" strokeWidth="5" strokeLinecap="round" />
+            <path className="koc-robot-mouth-default" d="M119 132C119 139 127 139 127 132C127 139 136 139 136 132" fill="none" stroke="#111827" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" />
+            <circle className="koc-robot-blush koc-robot-blush-left" cx="80" cy="134" r="7" fill="#f9a8d4" />
+            <circle className="koc-robot-blush koc-robot-blush-right" cx="181" cy="134" r="7" fill="#f9a8d4" />
+          </g>
+        </g>
+      </svg>
+    </button>
+  );
+}
+
 export default function Home() {
   const { status, isAuthenticated, openUnlockDialog } = useAuth();
   const [input, setInput] = useState('');
@@ -590,6 +750,11 @@ export default function Home() {
       setLoading(false);
       return;
     }
+    if (isCheckingAuth) {
+      setConversation(null);
+      setAgentStatus(null);
+      return;
+    }
     if (isAuthenticated) {
       const activeId = localId || readActiveConversationId();
       try {
@@ -612,7 +777,7 @@ export default function Home() {
     const conversations = readLocalConversations();
     const target = conversations.find((item) => item.local_id === localId) || conversations.find((item) => item.local_id === readActiveConversationId()) || null;
     setConversation(target);
-  }, [isAuthenticated, loadBackendConversation]);
+  }, [isAuthenticated, isCheckingAuth, loadBackendConversation]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => void loadConversation(), 0);
@@ -855,18 +1020,11 @@ export default function Home() {
 
   return (
     <div className="flex min-h-0 w-full flex-1 flex-col px-[4vw] pb-6 pt-7">
-      <header className="mb-5 flex shrink-0 items-center justify-between gap-4">
+      <header className="mb-5 flex shrink-0 items-center gap-4">
         <div className="min-w-0">
         <h1 className="koc-heading-font truncate text-[26px] leading-tight text-[var(--foreground)]">顶流小猪梨</h1>
           <p className="mt-1 text-[14px] text-[var(--muted-text)]">你的顶流打造小助手~</p>
         </div>
-        <button
-          type="button"
-          onClick={() => void handleNewChat()}
-          className="koc-heading-font shrink-0 rounded-full border border-[var(--box-border)] bg-white px-5 py-3 text-[15px] text-[var(--foreground)] shadow-[var(--box-shadow)] transition hover:bg-[var(--nav-hover)]"
-        >
-          新建对话 / 新角色
-        </button>
       </header>
 
       {isAnonymous && (
@@ -900,6 +1058,9 @@ export default function Home() {
           </section>
         ) : (
         <section className="relative flex min-h-0 flex-col rounded-[20px] border border-[var(--box-border)] bg-white shadow-[var(--box-shadow)]">
+          <div className="pointer-events-none absolute -top-[74px] right-7 z-20 sm:-top-[112px] sm:right-[clamp(48px,6vw,116px)]">
+            <ChatPerchedRobot loading={loading} />
+          </div>
           <div
             ref={chatContainerRef}
             onScroll={(event) => {
@@ -954,7 +1115,7 @@ export default function Home() {
 
           {showScrollDown && <ScrollToBottomButton onClick={scrollChatToBottom} />}
 
-          <ChatInputShell className="px-5 sm:px-7">
+          <ChatInputShell className="relative px-5 sm:px-7">
             <form onSubmit={handleSubmit} className="koc-chat-input-surface flex min-h-[72px] items-center rounded-full border border-[var(--box-border)] bg-[rgba(255,255,255,0.98)] px-5 sm:px-7">
               <input
                 ref={inputRef}

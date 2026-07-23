@@ -3,7 +3,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type WheelEvent as ReactWheelEvent } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { API_BASE, isRecord, readJsonResponse } from '@/lib/api';
 import {
@@ -179,29 +179,136 @@ function cropAvatarImage(source: string, scale: number, offsetX: number, offsetY
   });
 }
 
+function clampNumber(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
+}
+
 function AvatarCropPreview({
   source,
   scale,
   offsetX,
   offsetY,
+  onScaleChange,
+  onOffsetXChange,
+  onOffsetYChange,
+  variant = 'avatar',
   sizeClassName = 'size-32',
 }: {
   source?: string;
   scale: number;
   offsetX: number;
   offsetY: number;
+  onScaleChange?: (value: number) => void;
+  onOffsetXChange?: (value: number) => void;
+  onOffsetYChange?: (value: number) => void;
+  variant?: 'avatar' | 'editor';
   sizeClassName?: string;
 }) {
+  const dragRef = useRef<{ pointerId: number; startX: number; startY: number; offsetX: number; offsetY: number } | null>(null);
+  const editorStageRef = useRef<HTMLDivElement | null>(null);
+  const canAdjust = Boolean(isImageAvatar(source) && onOffsetXChange && onOffsetYChange);
+
+  const handlePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (!canAdjust) return;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    dragRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      offsetX,
+      offsetY,
+    };
+  };
+
+  const handlePointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const drag = dragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId || !onOffsetXChange || !onOffsetYChange) return;
+    const rect = event.currentTarget.getBoundingClientRect();
+    const sensitivity = variant === 'editor' ? 190 / Math.max(48, Math.min(rect.width, rect.height)) : 95 / Math.max(48, Math.min(rect.width, rect.height));
+    onOffsetXChange(clampNumber(drag.offsetX + (event.clientX - drag.startX) * sensitivity, 0, 100));
+    onOffsetYChange(clampNumber(drag.offsetY + (event.clientY - drag.startY) * sensitivity, 0, 100));
+  };
+
+  const handlePointerEnd = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (dragRef.current?.pointerId === event.pointerId) {
+      dragRef.current = null;
+    }
+  };
+
+  const handleWheel = (event: ReactWheelEvent<HTMLDivElement>) => {
+    if (!isImageAvatar(source) || !onScaleChange) return;
+    event.preventDefault();
+    event.stopPropagation();
+    onScaleChange(clampNumber(scale + (event.deltaY < 0 ? 0.06 : -0.06), 1, 2.4));
+  };
+
+  useEffect(() => {
+    const stage = editorStageRef.current;
+    if (variant !== 'editor' || !stage || !isImageAvatar(source) || !onScaleChange) return;
+    const handleNativeWheel = (event: WheelEvent) => {
+      if (!stage.contains(event.target as Node)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+      onScaleChange(clampNumber(scale + (event.deltaY < 0 ? 0.06 : -0.06), 1, 2.4));
+    };
+    window.addEventListener('wheel', handleNativeWheel, { capture: true, passive: false });
+    return () => window.removeEventListener('wheel', handleNativeWheel, { capture: true });
+  }, [onScaleChange, scale, source, variant]);
+
+  if (variant === 'editor') {
+    const editorTransform = `translate(${(offsetX - 50) * 2.2}px, ${(offsetY - 50) * 2.2}px) scale(${scale})`;
+    return (
+      <div
+        ref={editorStageRef}
+        className={`${sizeClassName} relative touch-none overflow-hidden overscroll-contain rounded-[12px] bg-[#15171b] ${canAdjust ? 'cursor-grab active:cursor-grabbing' : ''}`}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerEnd}
+        onPointerCancel={handlePointerEnd}
+        onWheelCapture={handleWheel}
+      >
+        {isImageAvatar(source) ? (
+          <>
+            <Image
+              src={source}
+              alt=""
+              width={420}
+              height={420}
+              draggable={false}
+              unoptimized
+              className="absolute inset-0 size-full select-none object-contain"
+              style={{ transform: editorTransform }}
+            />
+            <div className="pointer-events-none absolute left-1/2 top-1/2 size-[260px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/85 shadow-[0_0_0_9999px_rgba(15,23,42,0.5)]" />
+          </>
+        ) : (
+          <span className="flex size-full items-center justify-center">
+            <span className="block size-16 rounded-full bg-[#bfdbfe]" />
+          </span>
+        )}
+      </div>
+    );
+  }
+
   return (
-    <div className={`${sizeClassName} overflow-hidden rounded-full border border-[var(--box-border)] bg-[#eff6ff] shadow-[var(--box-shadow)]`}>
+    <div
+      className={`${sizeClassName} touch-none overflow-hidden rounded-full border border-[var(--box-border)] bg-[#eff6ff] shadow-[var(--box-shadow)] ${canAdjust ? 'cursor-grab active:cursor-grabbing' : ''}`}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerEnd}
+      onPointerCancel={handlePointerEnd}
+      onWheel={handleWheel}
+    >
       {isImageAvatar(source) ? (
         <Image
           src={source}
           alt=""
           width={160}
           height={160}
+          draggable={false}
           unoptimized
-          className="size-full object-cover"
+          className="size-full select-none object-cover"
           style={{
             transform: `translate(${(offsetX - 50) * 0.42}px, ${(offsetY - 50) * 0.42}px) scale(${scale})`,
           }}
@@ -239,6 +346,7 @@ export default function Sidebar() {
   const [deletingConversationId, setDeletingConversationId] = useState('');
   const [creatingProjectId, setCreatingProjectId] = useState('');
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [isAvatarEditorOpen, setIsAvatarEditorOpen] = useState(false);
   const [profileNameDraft, setProfileNameDraft] = useState('');
   const [profileAvatarDraft, setProfileAvatarDraft] = useState('');
   const [profileAvatarSource, setProfileAvatarSource] = useState('');
@@ -253,6 +361,11 @@ export default function Sidebar() {
   const userModuleRef = useRef<HTMLDivElement | null>(null);
 
   const syncConversations = useCallback(() => {
+    if (status === 'loading') {
+      setConversations([]);
+      setActiveConversationId('');
+      return;
+    }
     if (isAuthenticated) {
       void fetch(`${API_BASE}/api/agent/conversations`, { credentials: 'include' })
         .then((response) => (response.ok ? response.json() : Promise.reject(new Error('load failed'))))
@@ -269,7 +382,7 @@ export default function Sidebar() {
     }
     setConversations(readLocalConversations());
     setActiveConversationId(readActiveConversationId());
-  }, [isAuthenticated]);
+  }, [isAuthenticated, status]);
 
   useEffect(() => {
     const timer = window.setTimeout(syncConversations, 0);
@@ -325,6 +438,12 @@ export default function Sidebar() {
     }, 0);
     return () => window.clearTimeout(timer);
   }, [isUserMenuOpen, user]);
+
+  useEffect(() => {
+    if (!isUserMenuOpen) {
+      setIsAvatarEditorOpen(false);
+    }
+  }, [isUserMenuOpen]);
 
   const filteredConversations = useMemo(() => {
     const keyword = searchValue.trim().toLowerCase();
@@ -647,9 +766,9 @@ export default function Sidebar() {
           aria-label={isCollapsed ? '展开侧边栏' : '收起侧边栏'}
           title={isCollapsed ? '展开' : '收起'}
           onClick={() => updateCollapsed((current) => !current)}
-          className="grid size-10 shrink-0 place-items-center rounded-full text-[24px] text-[var(--foreground)] transition hover:bg-[var(--nav-hover)]"
+          className="grid size-10 shrink-0 place-items-center bg-transparent text-[16px] text-[var(--foreground)] transition hover:text-[#2563eb]"
         >
-          {isCollapsed ? '›' : '‹'}
+          {isCollapsed ? '▶' : '◀'}
         </button>
       </div>
 
@@ -819,7 +938,7 @@ export default function Sidebar() {
 
       <div ref={userModuleRef} className={`relative z-40 shrink-0 border-t border-[var(--box-border)] px-3 py-4 ${isCollapsed ? 'space-y-3' : 'space-y-2'}`}>
         {isAuthenticated && isUserMenuOpen && (
-          <div className={`fixed z-50 max-h-[calc(100vh-316px)] w-[320px] max-w-[calc(100vw-32px)] overflow-y-auto rounded-[18px] border border-[var(--box-border)] bg-white p-3 text-sm text-[var(--foreground)] shadow-[var(--box-shadow)] sm:w-[340px] ${isCollapsed ? 'bottom-3 left-[96px]' : 'left-[28px] top-[292px]'}`}>
+          <div className={`z-50 max-h-[calc(100vh-316px)] max-w-[calc(100vw-32px)] overflow-y-auto rounded-[18px] border border-[var(--box-border)] bg-white p-3 text-sm text-[var(--foreground)] shadow-[var(--box-shadow)] ${isCollapsed ? 'fixed bottom-3 left-[96px] w-[320px] sm:w-[340px]' : 'absolute bottom-[calc(100%+8px)] left-3 right-3'}`}>
             <div className="flex items-center gap-3">
               <AvatarBadge value={profileAvatarDraft} size="lg" />
               <div className="min-w-0">
@@ -829,23 +948,39 @@ export default function Sidebar() {
             </div>
 
             <div className="mt-2 rounded-[14px] border border-[var(--box-border)] bg-[#f8fbff] p-2">
-              <div className="grid gap-2 md:grid-cols-[88px_minmax(0,1fr)]">
-                <div className="flex flex-col items-center gap-1.5">
-                  <AvatarCropPreview
-                    source={profileAvatarSource || profileAvatarDraft}
-                    scale={profileAvatarScale}
-                    offsetX={profileAvatarOffsetX}
-                    offsetY={profileAvatarOffsetY}
-                    sizeClassName="size-16"
-                  />
-                  <label className="koc-heading-font flex h-8 w-full cursor-pointer items-center justify-center rounded-[12px] border border-[var(--box-border)] bg-white px-2 text-[12px] shadow-[var(--box-shadow)] transition hover:bg-[var(--nav-hover)]">
+              <div className="grid gap-2 md:grid-cols-[68px_minmax(0,1fr)]">
+                <div className="flex flex-col items-center gap-1">
+                  <div className="relative">
+                    <AvatarCropPreview
+                      source={profileAvatarSource || profileAvatarDraft}
+                      scale={profileAvatarScale}
+                      offsetX={profileAvatarOffsetX}
+                      offsetY={profileAvatarOffsetY}
+                      sizeClassName="size-14"
+                    />
+                    {isImageAvatar(profileAvatarSource || profileAvatarDraft) && (
+                      <button
+                        type="button"
+                        onClick={() => setIsAvatarEditorOpen(true)}
+                        aria-label="调整头像"
+                        title="调整头像"
+                        className="absolute -bottom-1 -right-1 grid size-6 place-items-center rounded-full border border-[var(--box-border)] bg-white text-[#2563eb] shadow-[var(--box-shadow)] transition hover:bg-[var(--nav-hover)]"
+                      >
+                        <svg viewBox="0 0 24 24" aria-hidden="true" className="size-3.5">
+                          <path d="M4 16.8V20h3.2L17.7 9.5l-3.2-3.2L4 16.8Z" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
+                          <path d="m13.4 7.4 3.2 3.2" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                        </svg>
+                      </button>
+                    )}
+                  </div>
+                  <label className="koc-heading-font flex h-7 w-full cursor-pointer items-center justify-center rounded-[12px] border border-[var(--box-border)] bg-white px-2 text-[12px] shadow-[var(--box-shadow)] transition hover:bg-[var(--nav-hover)]">
                     上传头像
                     <input type="file" accept="image/*" className="sr-only" onChange={(event) => handleProfileAvatarUpload(event.target.files?.[0])} />
                   </label>
                 </div>
-                <div className="min-w-0 space-y-1.5">
+                <div className="min-w-0 space-y-1">
                   <label className="block">
-                    <span className="mb-1.5 block text-[13px] text-[var(--foreground)]">用户名</span>
+                    <span className="mb-1 block text-[13px] text-[var(--foreground)]">用户名</span>
                     <input
                       value={profileNameDraft}
                       onChange={(event) => setProfileNameDraft(event.target.value.slice(0, 16))}
@@ -853,67 +988,71 @@ export default function Sidebar() {
                       placeholder="用户名 / 昵称"
                     />
                   </label>
-                  <label className="block">
-                    <span className="mb-1 block text-[13px] text-[var(--foreground)]">缩放</span>
-                    <input
-                      type="range"
-                      min="1"
-                      max="2.4"
-                      step="0.01"
-                      value={profileAvatarScale}
-                      onChange={(event) => setProfileAvatarScale(Number(event.target.value))}
-                      className="koc-avatar-range"
-                    />
-                  </label>
-                  <label className="block">
-                    <span className="mb-1 block text-[13px] text-[var(--foreground)]">左右</span>
-                    <input
-                      type="range"
-                      min="0"
-                      max="100"
-                      value={profileAvatarOffsetX}
-                      onChange={(event) => setProfileAvatarOffsetX(Number(event.target.value))}
-                      className="koc-avatar-range"
-                    />
-                  </label>
-                  <label className="block">
-                    <span className="mb-1 block text-[13px] text-[var(--foreground)]">上下</span>
-                    <input
-                      type="range"
-                      min="0"
-                      max="100"
-                      value={profileAvatarOffsetY}
-                      onChange={(event) => setProfileAvatarOffsetY(Number(event.target.value))}
-                      className="koc-avatar-range"
-                    />
-                  </label>
+                  <div className="flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setProfileAvatarSource('');
+                        setProfileAvatarDraft('');
+                        setProfileAvatarScale(1);
+                        setProfileAvatarOffsetX(50);
+                        setProfileAvatarOffsetY(50);
+                      }}
+                      className="koc-heading-font h-7 rounded-[12px] border border-[var(--box-border)] bg-white px-3 text-[12px] shadow-[var(--box-shadow)] transition hover:bg-[var(--nav-hover)]"
+                    >
+                      重置头像
+                    </button>
+                  </div>
                 </div>
-              </div>
-              <div className="mt-1.5 flex flex-col items-center gap-1.5 sm:flex-row sm:justify-end">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setProfileAvatarSource('');
-                    setProfileAvatarDraft('');
-                    setProfileAvatarScale(1);
-                    setProfileAvatarOffsetX(50);
-                    setProfileAvatarOffsetY(50);
-                  }}
-                  className="koc-heading-font h-8 rounded-[12px] border border-[var(--box-border)] bg-white px-3 text-[12px] shadow-[var(--box-shadow)] transition hover:bg-[var(--nav-hover)]"
-                >
-                  重置头像
-                </button>
               </div>
               <button
                 type="button"
                 disabled={isProfileSaving || !profileNameDraft.trim()}
                 onClick={() => void handleSaveProfile()}
-                className="koc-heading-font mt-1.5 h-8 w-full rounded-full bg-[var(--primary)] text-[13px] text-white shadow-[var(--cta-shadow)] transition hover:bg-[var(--primary-hover)] disabled:opacity-50"
+                className="koc-heading-font mt-2 h-8 w-full rounded-full bg-[var(--primary)] text-[13px] text-white shadow-[var(--cta-shadow)] transition hover:bg-[var(--primary-hover)] disabled:opacity-50"
               >
                 {isProfileSaving ? '保存中...' : '保存昵称和头像'}
               </button>
               {profileNotice && <p className="text-center text-[12px] text-[var(--muted-text)]">{profileNotice}</p>}
             </div>
+
+            {isAvatarEditorOpen && isImageAvatar(profileAvatarSource || profileAvatarDraft) && (
+              <div className="fixed inset-0 z-[70] flex items-center justify-center bg-[rgba(15,23,42,0.22)] px-4">
+                <div className="w-[340px] max-w-[calc(100vw-32px)] overflow-hidden rounded-[18px] border border-[var(--box-border)] bg-white shadow-[0_24px_60px_rgba(15,23,42,0.22)]">
+                  <div className="flex h-12 items-center justify-between border-b border-[var(--box-border)] px-4">
+                    <p className="koc-heading-font text-[16px] text-[var(--foreground)]">调整头像</p>
+                    <button
+                      type="button"
+                      onClick={() => setIsAvatarEditorOpen(false)}
+                      aria-label="关闭头像调整"
+                      className="grid size-8 place-items-center rounded-full text-[20px] text-[var(--muted-text)] transition hover:bg-[var(--nav-hover)]"
+                    >
+                      ×
+                    </button>
+                  </div>
+                  <div className="flex flex-col items-center gap-4 px-5 py-5">
+                    <AvatarCropPreview
+                      source={profileAvatarSource || profileAvatarDraft}
+                      scale={profileAvatarScale}
+                      offsetX={profileAvatarOffsetX}
+                      offsetY={profileAvatarOffsetY}
+                      onScaleChange={setProfileAvatarScale}
+                      onOffsetXChange={setProfileAvatarOffsetX}
+                      onOffsetYChange={setProfileAvatarOffsetY}
+                      variant="editor"
+                      sizeClassName="h-[420px] w-full"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setIsAvatarEditorOpen(false)}
+                      className="koc-heading-font h-10 w-full rounded-full bg-[var(--primary)] text-[14px] text-white shadow-[var(--cta-shadow)] transition hover:bg-[var(--primary-hover)]"
+                    >
+                      完成调整
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
 
             <div className="mt-3">
               <div className="mb-2 flex items-center justify-between">
