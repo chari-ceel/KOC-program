@@ -302,3 +302,61 @@ def test_build_complete_analysis_uses_relevant_track_name() -> None:
     assert payload is not None
     assert payload["trackName"] != "智能趋势分析"
     assert "恋与深空" in payload["trackName"] or "沈星回" in payload["trackName"]
+
+
+def test_build_complete_analysis_keeps_evidence_summary() -> None:
+    service = TrendService()
+
+    payload = service._build_complete_analysis(
+        {
+            "originalUserPreference": "大学生成长",
+            "trendSummary": {"niche": "大学生成长", "summary": "低成本成长内容值得验证。"},
+            "hotTrends": [{"name": "低成本成长", "reason": "公开网页有相关讨论"}],
+            "audienceNeeds": [{"need": "马上照做", "evidence": "用户偏好清单型内容"}],
+            "topicOpportunities": [{"title": "低成本自律清单", "angle": "从宿舍可做的小事切入"}],
+            "evidenceSummary": {
+                "tier": "public_web",
+                "label": "公开网页佐证",
+                "sourceType": "web_search",
+                "sourceCount": 2,
+                "validationKeywords": ["低成本成长"],
+                "limitations": "不代表官方热度排名。",
+            },
+        }
+    )
+
+    assert payload is not None
+    assert payload["evidenceSummary"]["label"] == "公开网页佐证"
+
+
+def test_build_complete_analysis_uses_useful_conservative_fallback_when_evidence_is_missing() -> None:
+    service = TrendService()
+
+    payload = service._build_complete_analysis(
+        {
+            "originalUserPreference": "瑶妹开黑日常",
+            "trendSummary": {"period": "7d", "platform": "xiaohongshu", "niche": "经验分享", "summary": ""},
+            "hotTrends": [],
+            "audienceNeeds": [],
+            "topicOpportunities": [
+                {"title": "瑶妹开黑日常新手先看这篇"},
+                {"title": "瑶妹开黑日常真实避坑清单"},
+                {"title": "瑶妹开黑日常怎么开始更稳"},
+            ],
+            "evidenceSummary": {
+                "tier": "inferred",
+                "label": "需要验证",
+                "sourceType": "none",
+                "sourceCount": 0,
+                "validationKeywords": [],
+                "limitations": "本轮未拿到可用检索结果，已降级为保守判断。",
+            },
+        }
+    )
+
+    assert payload is not None
+    assert "暂无" not in payload["trends"]
+    assert "暂无" not in payload["audience"]
+    assert "瑶妹开黑日常" in payload["trends"]
+    assert "需要验证" in payload["trends"]
+    assert "新手" in payload["audience"]

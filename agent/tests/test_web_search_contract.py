@@ -93,6 +93,66 @@ def test_registry_returns_disabled_result_for_xhs_fetcher_by_default() -> None:
     assert call.status == "failed"
 
 
+def test_registry_reports_xhs_fetcher_needs_config_when_enabled_without_provider() -> None:
+    registry = ToolRegistry(Settings(ENABLE_XHS_FETCHER=True))
+
+    doctor = registry.doctor()
+    xhs_status = next(source for source in doctor["sources"] if source["source"] == "xhs_fetcher")
+    result, call = registry.search(
+        RetrievalToolRequest(source="xhs_fetcher", query="小红书 大学生成长 热门选题")
+    )
+
+    assert xhs_status["status"] == "needs_config"
+    assert result.status == "failed"
+    assert result.error is not None
+    assert result.error.code == "NEEDS_CONFIG"
+    assert call.status == "failed"
+
+
+def test_xhs_fetcher_mcp_provider_normalizes_results(monkeypatch) -> None:
+    class FakeResponse:
+        status_code = 200
+
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> dict:
+            return {
+                "items": [
+                    {
+                        "title": "宿舍低成本自律清单",
+                        "url": "https://www.xiaohongshu.com/explore/test",
+                        "content": "适合大学生成长账号参考。",
+                        "likes": 1200,
+                        "collects": 300,
+                    }
+                ]
+            }
+
+    def fake_post(*args, **kwargs):
+        return FakeResponse()
+
+    monkeypatch.setattr("app.tools.registry.httpx.post", fake_post)
+    registry = ToolRegistry(
+        Settings(
+            ENABLE_XHS_FETCHER=True,
+            XHS_FETCHER_PROVIDER="xiaohongshu_mcp",
+            XHS_MCP_BASE_URL="https://mcp.example.test",
+            XHS_MCP_API_KEY="test-key",
+        )
+    )
+
+    result, call = registry.search(
+        RetrievalToolRequest(source="xhs_fetcher", query="小红书 大学生成长 热门选题")
+    )
+
+    assert result.status == "success"
+    assert call.status == "success"
+    assert result.items[0].title == "宿舍低成本自律清单"
+    assert result.items[0].metadata["provider"] == "xiaohongshu_mcp"
+    assert result.items[0].metadata["evidenceTier"] == "direct_xhs"
+
+
 def test_registry_aggregates_and_scores_multiple_queries() -> None:
     class FakeSearchTool:
         name = "web_search"

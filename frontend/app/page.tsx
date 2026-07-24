@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
+import type { AgentContentDraftPoint, AgentFlowSummaryItem, AgentQuestionBlock } from '@/lib/agent-chat-contract';
 
 const guideItems = [
   {
@@ -101,6 +102,23 @@ const introRibbonParticles = [
 
 function revealStyle(delayMs: number) {
   return { ['--koc-reveal-delay' as '--koc-reveal-delay']: `${delayMs}ms` } as CSSProperties;
+}
+
+function compactText(text: string, maxLength = 30) {
+  const normalized = text.trim().replace(/\s+/g, ' ');
+  if (!normalized) return '';
+  const firstSentence = normalized.split(/[。；;.!！?？]/)[0] || normalized;
+  return firstSentence.length > maxLength ? `${firstSentence.slice(0, maxLength)}...` : firstSentence;
+}
+
+function FlowStepIcon({ done }: { done: boolean }) {
+  return done ? (
+    <span className="mt-0.5 grid size-6 shrink-0 place-items-center rounded-full border border-[#22c55e] bg-[#dcfce7] text-[14px] font-bold text-[#16a34a]">
+      ✓
+    </span>
+  ) : (
+    <span className="mt-1 size-3 shrink-0 rounded-full border border-[#cbd5e1] bg-white" />
+  );
 }
 
 function FeatureGuideCard({
@@ -257,6 +275,7 @@ function RobotMascot() {
   );
 }
 
+
 function DemoBubble({ text, className }: { text: string; className: string }) {
   return (
     <div className={`koc-home-bubble rounded-full border border-white/60 bg-white/62 px-5 py-3 text-[18px] text-[var(--foreground)] shadow-[0_14px_28px_rgba(15,23,42,0.08)] backdrop-blur-md ${className}`}>
@@ -265,6 +284,117 @@ function DemoBubble({ text, className }: { text: string; className: string }) {
   );
 }
 
+function FlowSummaryBlock({
+  item,
+  contentPoints,
+  fallbackTitle,
+  fallbackHint,
+  active,
+  onTrace,
+}: {
+  item: AgentFlowSummaryItem;
+  contentPoints?: AgentContentDraftPoint[];
+  fallbackTitle: string;
+  fallbackHint: string;
+  active: boolean;
+  onTrace: (messageId: string | null) => void;
+}) {
+  const summaryText = compactText(item.text, active && item.title === '人设打造' ? 24 : 72);
+  const hasContentPoints = Boolean(contentPoints?.length);
+  const canTraceStep = Boolean(item.message_id);
+  const evidence = item.evidence_summary;
+  const evidenceLabel = evidence?.label || (evidence?.tier === 'direct_xhs' ? '直接小红书证据' : evidence?.tier === 'public_web' ? '公开网页佐证' : evidence?.tier ? '需要验证' : '');
+  const evidenceClass = evidence?.tier === 'direct_xhs'
+    ? 'border-[#bbf7d0] bg-[#f0fdf4] text-[#166534]'
+    : evidence?.tier === 'public_web'
+      ? 'border-[#bfdbfe] bg-[#eff6ff] text-[#1d4ed8]'
+      : 'border-[#fde68a] bg-[#fffbeb] text-[#92400e]';
+  return (
+    <section className={`rounded-[16px] border px-4 py-4 ${active ? 'border-[#bfdbfe] bg-[#eff6ff]' : 'border-[var(--box-border)] bg-white'}`}>
+      <div className="flex items-start gap-3">
+        <FlowStepIcon done={item.done} />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center justify-between gap-2">
+            {canTraceStep ? (
+              <button
+                type="button"
+                onClick={() => onTrace(item.message_id)}
+                className="koc-heading-font text-left text-[16px] leading-tight text-[var(--foreground)] transition hover:text-[#2563eb]"
+              >
+                {item.title || fallbackTitle}
+              </button>
+            ) : (
+              <h3 className="koc-heading-font text-[16px] leading-tight text-[var(--foreground)]">{item.title || fallbackTitle}</h3>
+            )}
+            {active && <span className="rounded-full bg-[#dbeafe] px-2 py-0.5 text-[11px] text-[#1d4ed8]">当前</span>}
+          </div>
+          {evidenceLabel && (
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <span className={`rounded-full border px-2 py-0.5 text-[11px] ${evidenceClass}`}>
+                {evidenceLabel}
+              </span>
+              {evidence?.limitations && (
+                <span className="block max-w-full truncate text-[11px] text-[var(--muted-text)]">
+                  {evidence.limitations}
+                </span>
+              )}
+            </div>
+          )}
+          {hasContentPoints ? (
+            <div className="mt-2 space-y-1.5">
+              {contentPoints?.map((point, index) => (
+                <button
+                  key={point.id || point.memory_id || `${point.title}-${index}`}
+                  type="button"
+                  onClick={() => onTrace(point.message_id)}
+                  className={`block w-full whitespace-normal break-words text-left text-[13px] leading-6 transition hover:text-[#2563eb] ${
+                    point.active ? 'font-semibold text-[var(--foreground)]' : 'text-[var(--muted-text)]'
+                  }`}
+                >
+                  {index + 1}. {point.title}
+                </button>
+              ))}
+            </div>
+          ) : summaryText ? (
+            <button type="button" onClick={() => onTrace(item.message_id)} className="mt-2 block w-full truncate text-left text-[13px] leading-6 text-[var(--muted-text)] transition hover:text-[#2563eb]">
+              {summaryText}
+            </button>
+          ) : (
+            <p className="mt-2 text-[13px] leading-6 text-[var(--muted-text)]">{fallbackHint}</p>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function AgentQuestionBlocks({
+  blocks,
+  disabled,
+  onSelect,
+}: {
+  blocks: AgentQuestionBlock[];
+  disabled: boolean;
+  onSelect: (block: AgentQuestionBlock) => void;
+}) {
+  if (!blocks.length) return null;
+  return (
+    <div className="mt-4 space-y-3">
+      {blocks.map((block) => (
+        <div key={block.id || block.question} className="rounded-[12px] border border-[#dbeafe] bg-[#f8fbff] px-3.5 py-3">
+          <button
+            type="button"
+            disabled={disabled}
+            onClick={() => onSelect(block)}
+            className="block w-full text-left text-[14px] font-semibold leading-6 text-[#1d4ed8] transition hover:text-[#1e40af] disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {block.question}
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+}
 function OpeningBrandIntro() {
   return (
     <div className="koc-brand-intro" aria-hidden="true">

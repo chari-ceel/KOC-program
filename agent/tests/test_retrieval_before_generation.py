@@ -95,3 +95,41 @@ def test_workflow_runs_retrieval_before_final_generation(monkeypatch) -> None:
     assert "Web Search Results" in runtime.generated_prompt
     assert response.tool_calls
     assert response.sources[0]["sourceType"] == "web_search"
+    assert response.metadata["evidenceSummary"]["label"] == "公开网页佐证"
+
+
+def test_trend_workflow_continues_when_forced_retrieval_fails(monkeypatch) -> None:
+    def fake_search_with_fallback(self, request: RetrievalToolRequest) -> tuple[RetrievalToolResult, list[ToolCall]]:
+        result = RetrievalToolResult(source=request.source, status="failed", items=[])
+        call = build_tool_call(request=request, result=result, duration_ms=8)
+        return result, [call]
+
+    monkeypatch.setattr(ToolRegistry, "search_with_fallback", fake_search_with_fallback)
+
+    runtime = CapturingRuntime()
+    workflow = TrendTrackingWorkflow()
+    workflow.runtime = runtime
+
+    response = workflow.track(
+        AgentRunRequest(
+            requestId="req_retrieval_failed_open",
+            taskType="trend.track",
+            platform="xiaohongshu",
+            userId="demo-user",
+            input={"userPreference": "更容易涨粉的选题"},
+            context={
+                "savedPersona": {
+                    "persona": {"name": "大学生成长型学习博主"},
+                    "niche": {"primary": "大学生成长"},
+                }
+            },
+            options={"enableTools": True, "maxToolCalls": 2},
+        )
+    )
+
+    assert response.status == "success"
+    assert response.metadata["webSearchDecision"] == "failed_open"
+    assert response.metadata["evidenceSummary"]["tier"] == "inferred"
+    assert runtime.generated_request is not None
+    assert runtime.generated_request.context["toolResults"][0]["status"] == "failed"
+    assert runtime.generated_request.context["evidenceSummary"]["label"] == "需要验证"

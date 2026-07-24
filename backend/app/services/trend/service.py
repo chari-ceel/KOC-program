@@ -116,6 +116,8 @@ class TrendService:
             }
 
         response_data = dict(response.data or {})
+        if isinstance(response.metadata, dict) and isinstance(response.metadata.get("evidenceSummary"), dict):
+            response_data.setdefault("evidenceSummary", response.metadata["evidenceSummary"])
         response_data.setdefault("originalUserPreference", preference)
         complete_analysis = self._build_complete_analysis(response_data)
         next_memory_state = await self.memory_service.refresh_state(
@@ -175,15 +177,69 @@ class TrendService:
         ]
         topics = self._complete_topic_titles(data, hot_trends, audience_needs, topics)
         card_preview = self._build_card_preview(data, hot_trends, topics)
+        track_name = self._build_track_name(data, summary, hot_trends, audience_needs, topics)
+        evidence_summary = data.get("evidenceSummary")
+
+        if not trends_text:
+            trends_text = self._conservative_trend_text(track_name, topics, evidence_summary)
+        if not audience_text:
+            audience_text = self._conservative_audience_text(track_name, topics, evidence_summary)
 
         complete_analysis = {
-            "trackName": self._build_track_name(data, summary, hot_trends, audience_needs, topics),
-            "trends": trends_text or "暂无趋势分析。",
-            "audience": audience_text or "暂无受众需求洞察。",
+            "trackName": track_name,
+            "trends": trends_text or "需要先用关键词验证这个方向的近期热度，再决定主推角度。",
+            "audience": audience_text or "适合先围绕新手困惑、避坑清单和可照做方法做小范围测试。",
             "topics": topics[:3],
             "cardPreview": card_preview,
         }
+        if isinstance(evidence_summary, dict):
+            complete_analysis["evidenceSummary"] = evidence_summary
         return complete_analysis if self._is_complete_analysis(complete_analysis) else None
+
+    def _conservative_trend_text(
+        self,
+        track_name: str,
+        topics: list[str],
+        evidence_summary: Any,
+    ) -> str:
+        label = self._evidence_label(evidence_summary)
+        topic_hint = self._topic_hint(topics)
+        track = self._sanitize_trend_copy(track_name) or "这个方向"
+        if label == "需要验证":
+            return (
+                f"{track}暂时没有拿到可直接证明热度的小红书数据，属于需要验证方向；建议先按“{topic_hint}”这类可收藏、可避坑、可照做的图文角度做保守测试；"
+                "发布前再用关键词搜索近期笔记数量、标题重复度和评论问题。"
+            )
+        return f"{track}已有{label}，可以优先围绕“{topic_hint}”做图文选题，但仍建议发布前复查近期笔记和评论反馈。"
+
+    def _conservative_audience_text(
+        self,
+        track_name: str,
+        topics: list[str],
+        evidence_summary: Any,
+    ) -> str:
+        track = self._sanitize_trend_copy(track_name) or "这个方向"
+        topic_hint = self._topic_hint(topics)
+        label = self._evidence_label(evidence_summary)
+        prefix = "在缺少直接热度数据时，" if label == "需要验证" else ""
+        return (
+            f"{prefix}{track}更适合先抓新手、想少踩坑、想快速判断值不值得继续投入的人群；"
+            f"内容最好落到“{topic_hint}”这样的具体问题，避免只写泛泛经验。"
+        )
+
+    def _topic_hint(self, topics: list[str]) -> str:
+        for topic in topics:
+            cleaned = self._sanitize_trend_copy(topic)
+            if cleaned:
+                return self._short_preview_phrase(cleaned) or cleaned[:18]
+        return "新手先看、避坑清单、怎么开始更稳"
+
+    def _evidence_label(self, evidence_summary: Any) -> str:
+        if isinstance(evidence_summary, dict):
+            label = evidence_summary.get("label")
+            if isinstance(label, str) and label.strip():
+                return label.strip()
+        return "需要验证"
 
     def _build_track_name(
         self,

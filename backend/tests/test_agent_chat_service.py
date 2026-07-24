@@ -638,12 +638,42 @@ def test_persona_recovery_questions_are_generic_after_agent_retry_failure():
         {"persona": None, "trending": None, "content": None},
     )
 
-    assert questions == [
+    assert len(questions) == 3
+    assert len({service._question_signature(question) for question in questions}) == 3
+    assert len({service._persona_question_semantic_key(question) for question in questions}) == 3
+    assert not any("修仙" in question or "短剧" in question or "cos" in question for question in questions)
+
+
+def test_persona_recovery_questions_do_not_repeat_shown_starter_cards():
+    service = build_service()
+    shown_questions = [
         "你现在是什么身份或阶段？比如学生、职场新人、宝妈、自由职业都可以说",
         "你最愿意长期聊什么？比如爱好、生活经验、学习工作、喜欢的内容都可以",
         "你更想分享哪类内容？比如测评、清单、避坑、教程、真实日常都可以",
     ]
-    assert not any("修仙" in question or "短剧" in question or "cos" in question for question in questions)
+
+    questions = service._persona_recovery_questions(
+        "我和队友开黑只玩瑶，想做人设",
+        {
+            "history_messages": [
+                {"role": "assistant", "content": "先回答下面的问题"},
+                {"role": "user", "content": "你最愿意长期聊什么？比如爱好、生活经验、学习工作、喜欢的内容都可以: 我喜欢玩瑶，尤其是开黑和高评分局"},
+            ],
+            "shown_persona_questions": shown_questions,
+            "shown_persona_question_signatures": [service._question_signature(question) for question in shown_questions],
+            "shown_persona_question_keys": [service._persona_question_semantic_key(question) for question in shown_questions],
+        },
+        {"persona": None, "trending": None, "content": None},
+    )
+
+    assert len(questions) == 3
+    assert not set(questions) & set(shown_questions)
+    assert not {
+        service._question_signature(question) for question in questions
+    } & {service._question_signature(question) for question in shown_questions}
+    assert not {
+        service._persona_question_semantic_key(question) for question in questions
+    } & {service._persona_question_semantic_key(question) for question in shown_questions}
     assert not any("穿搭" in question or "美妆" in question for question in questions)
 
 
@@ -656,7 +686,8 @@ def test_persona_recovery_reply_does_not_expose_internal_failure_terms():
         ["少于 3 个问题", "过滤重复、已回答或无效问题后不足 3 个"],
     )
 
-    assert "我换一种更好回答的方式问你" in reply
+    assert "先从这 3 个轻松问题里挑一个就行" in reply
+    assert "换一种更好回答的方式" not in reply
     forbidden = ("质量检查", "不合格", "被拦下", "Agent 没有生成", "fallback", "内部失败")
     assert not any(term in reply for term in forbidden)
 
@@ -698,6 +729,96 @@ def test_persona_reply_bolds_summary_labels():
     assert "**内容方向：**" in reply
     assert "**目标受众：**" in reply
     assert "**内容风格：**" in reply
+
+
+def test_persona_recovery_reply_keeps_known_persona_visible():
+    service = build_service()
+
+    reply = service._persona_recovery_reply(
+        "你更适合什么更新节奏？比如随手记录、每周整理、追热点补充、长期慢慢写都可以",
+        {},
+        ["persona_question_gate_failed"],
+        {
+            "persona": {"name": "校园日常记录者", "description": "记录高中生活和同桌趣事"},
+            "niche": {"primary": "女高中生校园日常"},
+            "audience": ["同龄学生"],
+            "contentStyle": ["搞笑日常", "真实碎碎念"],
+        },
+    )
+
+    assert reply.startswith("**人设标题：** 校园日常记录者")
+    assert "我先把目前已经识别到" not in reply
+    assert "换一种更好回答的方式" not in reply
+    assert "**内容方向：** 女高中生校园日常" in reply
+    assert "**目标受众：** 同龄学生" in reply
+
+
+def test_unsaved_persona_answer_with_hotspot_words_stays_in_persona_step():
+    service = build_service()
+    unsaved_persona_memory = {
+        "memory_id": "persona_1",
+        "module": "persona",
+        "done": False,
+        "payload": {
+            "persona": {"name": "校园日常记录者"},
+            "niche": {"primary": "女高中生校园日常"},
+        },
+    }
+
+    step = service._decide_step(
+        "你更适合什么更新节奏？比如随手记录、每周整理、追热点补充、长期慢慢写都可以: 随手记录",
+        "persona",
+        {"persona": unsaved_persona_memory, "trending": None, "content": None},
+    )
+
+    assert step == "persona"
+
+
+@pytest.mark.anyio
+async def test_persona_follow_up_updates_visible_card_with_user_detail(monkeypatch):
+    memory = FakeMemoryCRUD()
+    service = build_service(memory)
+
+    first = await service.chat(user_id="user-a", message="我想做真实生活记录博主")
+
+    async def follow_up_with_partial_draft(*args, **kwargs):
+        return {
+            "data": {
+                "reply": "这个方向可以继续做得更文艺一点。",
+                "personaDraft": {
+                    "contentStyle": ["文艺型图配文"],
+                    "followUpQuestions": [
+                        "你现在手机里有没有现成的日常素材呀？",
+                        "有没有你非常不喜欢、绝对不会在自己内容里出现的风格呀？",
+                        "你希望读者看完之后获得什么感受呀？",
+                    ],
+                },
+                "nextQuestions": [
+                    "你现在手机里有没有现成的日常素材呀？",
+                    "有没有你非常不喜欢、绝对不会在自己内容里出现的风格呀？",
+                    "你希望读者看完之后获得什么感受呀？",
+                ],
+            },
+            "warnings": [],
+        }
+
+    monkeypatch.setattr(service.persona_service, "follow_up", follow_up_with_partial_draft)
+
+    response = await service.chat(
+        user_id="user-a",
+        conversation_id=first["conversation_id"],
+        current_step="persona",
+        message="我希望写的文案是文艺型的",
+    )
+
+    assert "文艺型" in response["assistant_message"]["content"]
+    assert "文艺型" in response["copy_payload"]["copy_text"]
+    persona_memory = memory.get_agent_module_memory(
+        "user-a",
+        first["conversation_id"],
+        response["memory_refs"]["persona_memory_id"],
+    )
+    assert any("文艺型" in item for item in persona_memory["payload"]["contentStyle"])
 
 
 
@@ -902,6 +1023,42 @@ async def test_conversation_history_is_named_by_persona_summary():
     assert history["conversations"][0]["title"] == first["conversation_title"]
     assert "平价美妆测评博主" in history["conversations"][0]["title"]
 
+
+
+
+def test_persona_summary_prefers_real_persona_name_over_card_preview():
+    memory = FakeMemoryCRUD()
+    service = build_service(memory)
+
+    conversation_id = "conv_summary_1"
+    memory.upsert_agent_chat_conversation(
+        "user-a",
+        conversation_id,
+        {
+            "title": "新建对话",
+            "current_step": "persona",
+            "active_persona_memory_id": "persona_1",
+            "active_trending_memory_id": None,
+            "active_content_memory_id": None,
+        },
+    )
+    memory.save_agent_module_memory(
+        user_id="user-a",
+        conversation_id=conversation_id,
+        module="persona",
+        title="人设打造",
+        summary_text="规则怪谈短剧分享",
+        payload={
+            "persona": {"name": "规则怪谈AI短剧达人"},
+            "cardPreview": {"personaLabel": "规则怪谈短剧分享"},
+        },
+        source_message_id="msg_1",
+        done=True,
+    )
+
+    summary = service._build_summary("user-a", conversation_id, memory.get_agent_chat_conversation("user-a", conversation_id))
+
+    assert summary["persona"]["text"] == "规则怪谈AI短剧达人"
 
 @pytest.mark.anyio
 async def test_delete_conversation_removes_messages_and_memories():

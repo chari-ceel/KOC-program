@@ -40,7 +40,11 @@ class ContentService:
         agent_debug: dict | None = None,
         conversation_scope_id: str | None = None,
     ) -> dict:
-        selected_topic = {"topic": topic}
+        current_draft_title = self._draft_title(current_draft)
+        selected_topic_title = current_draft_title or topic
+        selected_topic = {"topic": selected_topic_title}
+        if selected_topic_title and selected_topic_title.strip():
+            selected_topic["selectedTitle"] = selected_topic_title.strip()
         if conversation_scope_id or current_draft:
             try:
                 context = await self.builder.build_content_draft_context(
@@ -72,14 +76,15 @@ class ContentService:
         is_initial_page_first_turn = not current_draft and self._should_force_initial_full_draft(conversation_history)
         force_full_draft = is_initial_page_first_turn if not current_draft else self._should_force_full_draft(revision_instruction or instruction, conversation_history)
         agent_instruction = (
-            self._build_initial_full_draft_instruction(topic, instruction)
+            self._build_initial_full_draft_instruction(selected_topic_title, instruction)
             if is_initial_page_first_turn
             else instruction
         )
         input_data = {
-            "topic": topic,
+            "topic": selected_topic_title,
             "userInstruction": agent_instruction,
             "originalUserInstruction": instruction,
+            "selectedTitle": selected_topic_title.strip() if isinstance(selected_topic_title, str) else "",
         }
         if current_draft:
             input_data["currentDraft"] = current_draft
@@ -107,6 +112,26 @@ class ContentService:
 
         draft = (response.data or {}).get("revisedDraft") or (response.data or {}).get("draft", {}) or {}
         complete_draft = self._build_complete_draft(response.data)
+        if complete_draft and is_initial_page_first_turn and isinstance(selected_topic_title, str) and selected_topic_title.strip():
+            locked_title = self._limit_xhs_title(selected_topic_title)
+            if locked_title:
+                complete_draft["title"] = locked_title
+                complete_draft["selectedTitle"] = locked_title
+                title_options = complete_draft.get("titleOptions")
+                if isinstance(title_options, list):
+                    complete_draft["titleOptions"] = [locked_title, *[item for item in title_options if item != locked_title]][:5]
+                else:
+                    complete_draft["titleOptions"] = [locked_title]
+        elif complete_draft and current_draft and not self._revision_requests_title_change(revision_instruction or instruction):
+            locked_title = self._limit_xhs_title(current_draft_title or selected_topic_title)
+            if locked_title:
+                complete_draft["title"] = locked_title
+                complete_draft["selectedTitle"] = locked_title
+                title_options = complete_draft.get("titleOptions")
+                if isinstance(title_options, list):
+                    complete_draft["titleOptions"] = [locked_title, *[item for item in title_options if item != locked_title]][:5]
+                else:
+                    complete_draft["titleOptions"] = [locked_title]
         suggestions = self._read_suggestions(response.data) if complete_draft else []
         next_memory_state = await self.memory_service.refresh_state(
             user_id=user_id,
@@ -186,6 +211,12 @@ class ContentService:
         if not isinstance(value, str):
             return ""
         return value.strip()[:XHS_TITLE_MAX_CHARS].strip()
+
+    def _draft_title(self, draft: Any) -> str:
+        if not isinstance(draft, dict):
+            return ""
+        title = draft.get("selectedTitle") or draft.get("title")
+        return title.strip() if isinstance(title, str) else ""
 
     def _format_content_text(self, data: Dict[str, Any]) -> str:
         draft = data.get("revisedDraft") or data.get("draft", {}) or {}
@@ -525,8 +556,13 @@ class ContentService:
     def _build_initial_full_draft_instruction(self, topic: str, instruction: str) -> str:
         raw_topic = (topic or "").strip()
         raw_instruction = (instruction or "").strip() or raw_topic
+        title_lock_instruction = (
+            f'Clicked title: "{raw_topic}". Set draft.selectedTitle exactly to this title. '
+            "Write the cover, intro, body, ending, tags, and cardPreview for this title only."
+        )
         return "\n".join(
             [
+                title_lock_instruction,
                 "这是内容撰写初始页的首条业务输入。",
                 "身份边界：顶流小猪梨只是 Agent 助手昵称，不是用户的人设、账号名或内容主角；用户的具体人设只以 context.savedPersona 为准。",
                 "请把用户原始输入直接理解为本轮要写的主题、口吻要求或写作方向，不要先停留在讨论态，也不要只给思路。",
@@ -638,6 +674,28 @@ class ContentService:
             return False
 
         return False
+
+    def _revision_requests_title_change(self, instruction: str) -> bool:
+        text = re.sub(r"\s+", "", (instruction or ""))
+        if not text:
+            return False
+        title_change_markers = (
+            "改标题",
+            "换标题",
+            "标题改",
+            "标题换",
+            "标题优化",
+            "标题调整",
+            "标题更",
+            "标题短",
+            "标题长",
+            "标题口语化",
+            "标题生活化",
+            "标题搜索词",
+            "标题吸引",
+            "标题更像搜索词",
+        )
+        return any(marker in text for marker in title_change_markers)
 
     def _normalize_saved_draft(self, draft: Dict[str, Any]) -> Dict[str, Any]:
         normalized = dict(draft or {})

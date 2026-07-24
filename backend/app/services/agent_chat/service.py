@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import re
 import unicodedata
+from copy import deepcopy
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Literal, Optional
 from uuid import uuid4
@@ -817,8 +818,10 @@ class UnifiedAgentChatService:
         text = re.sub(r"\s+", "", message.lower())
         if self._matches(text, ("改人设", "换人设", "改定位", "换定位", "重新做人设", "我不是", "账号定位")):
             return "persona"
+        if requested_step == "persona" and not self._memory_done(module_memories.get("persona")):
+            return "persona"
         if self._matches(text, ("换选题", "再追热点", "追热点", "热门", "趋势", "选题", "推荐选题")):
-            return "trending" if module_memories.get("persona") else "persona"
+            return "trending" if self._memory_done(module_memories.get("persona")) else "persona"
         if self._matches(text, ("写正文", "写内容", "写草稿", "生成草稿", "改标题", "重写开头", "改正文", "润色")):
             if not module_memories.get("persona"):
                 return "persona"
@@ -934,7 +937,9 @@ class UnifiedAgentChatService:
         question_context = question_context or {}
         prompt_override = self._persona_question_prompt_override(message, question_context, None)
         called_service = "PersonaService.follow_up" if existing else "PersonaService.analyze"
+        existing_payload = self._payload(existing) if isinstance(existing, dict) else {}
         last_reasons: list[str] = []
+        last_payload: Dict[str, Any] = {}
 
         for attempt in range(3):
             if existing:
@@ -958,6 +963,9 @@ class UnifiedAgentChatService:
 
             data = result.get("data") or {}
             payload = data.get("structuredResult") or data.get("personaDraft") or data
+            payload = self._merge_persona_follow_up_payload(existing_payload, payload, message)
+            if isinstance(payload, dict) and self._persona_copy_text(payload):
+                last_payload = payload
             raw_questions = self._extract_persona_questions(data, payload)
             questions, reasons = self._validate_persona_agent_questions(raw_questions, payload, question_context)
             done = self._has_persona_payload(payload)
@@ -966,7 +974,7 @@ class UnifiedAgentChatService:
                 return {
                     "reply": self._persona_reply(data, payload),
                     "summary_text": self._persona_summary(payload),
-                    "payload": payload if done else None,
+                    "payload": payload if done or self._persona_copy_text(payload) else None,
                     "done": done,
                     "readiness": "ready_for_approval" if agent_ready else "needs_more_info",
                     "questions": questions,
@@ -976,10 +984,16 @@ class UnifiedAgentChatService:
             prompt_override = self._persona_question_prompt_override(message, question_context, last_reasons)
 
         recovery_questions = self._persona_recovery_questions(message, question_context, module_memories)
+        recovery_payload = last_payload if self._persona_copy_text(last_payload) else existing_payload
         return {
-            "reply": self._persona_recovery_reply(message, question_context, last_reasons),
-            "summary_text": self._persona_summary(self._payload(existing)) if isinstance(existing, dict) else "",
-            "payload": self._payload(existing) if isinstance(existing, dict) and self._has_persona_payload(self._payload(existing)) else None,
+            "reply": self._persona_recovery_reply(
+                message,
+                question_context,
+                last_reasons,
+                recovery_payload,
+            ),
+            "summary_text": self._persona_summary(recovery_payload),
+            "payload": recovery_payload if self._has_persona_payload(recovery_payload) else None,
             "done": False,
             "readiness": "needs_more_info",
             "questions": recovery_questions,
@@ -1690,10 +1704,18 @@ class UnifiedAgentChatService:
         latest_message: str,
         question_context: Dict[str, Any],
         failure_reasons: list[str],
+        payload: Dict[str, Any] | None = None,
     ) -> str:
         del latest_message, question_context, failure_reasons
+        preview = self._persona_copy_text(payload or {})
+        if preview:
+            return (
+                f"{preview}\n\n"
+                "这个人设已经有雏形了，你可以继续补充细节。\n\n"
+                "如果你觉得这版人设已经够用了，也可以点保存人设，我会带你进入热门追踪。"
+            )
         return (
-            "我换一种更好回答的方式问你，先从这 3 个轻松问题里挑一个就行。\n\n"
+            "先从这 3 个轻松问题里挑一个就行。\n\n"
             "不用一次说完整，随便补一句也可以，我会继续帮你把人设往可保存的方向整理。"
         )
 
@@ -1703,8 +1725,23 @@ class UnifiedAgentChatService:
         question_context: Dict[str, Any],
         module_memories: Dict[str, Optional[Dict[str, Any]]],
     ) -> list[str]:
-        del latest_message, question_context, module_memories
-        return self._layered_persona_recovery_questions()
+        context = {**question_context}
+        payload = self._payload(module_memories.get("persona")) if isinstance(module_memories, dict) else {}
+        context_text = self._persona_recovery_context_text(latest_message, context)
+        answered_dimensions = self._answered_persona_dimensions(payload, context)
+        for dimension in self._missing_persona_dimensions(context_text):
+            if dimension == "身份阶段":
+                answered_dimensions.discard("identity")
+            elif dimension == "兴趣方向":
+                answered_dimensions.discard("interest")
+        asked_signatures = self._asked_question_signatures(context)
+        asked_keys = self._asked_persona_question_keys(context)
+        return self._filter_persona_questions(
+            self._layered_persona_recovery_questions(),
+            answered_dimensions,
+            asked_signatures,
+            asked_keys,
+        )
 
     def _dynamic_persona_fallback_questions(self, context_text: str) -> list[str]:
         del context_text
@@ -1719,6 +1756,15 @@ class UnifiedAgentChatService:
             "你现在是什么身份或阶段？比如学生、职场新人、宝妈、自由职业都可以说",
             "你最愿意长期聊什么？比如爱好、生活经验、学习工作、喜欢的内容都可以",
             "你更想分享哪类内容？比如测评、清单、避坑、教程、真实日常都可以",
+            "你最想让哪类人看到你？比如同好、新手、同龄人、正在踩坑的人都可以",
+            "你手上最容易拿出来的素材是什么？比如截图、照片、日常片段、笔记都可以",
+            "你希望自己的表达更像哪种感觉？比如真实陪伴、轻松吐槽、认真整理、温柔安利都可以",
+            "有哪些内容或表达是你明确不想做的？比如露脸、争议话题、太硬的教程都可以",
+            "如果把你和同类账号区分开，你希望别人记住你的哪个特点？",
+            "围绕这个方向，你更想先做哪种固定栏目？比如避坑清单、体验日记、入门攻略、好物测评都可以",
+            "你更适合什么更新节奏？比如随手记录、每周整理、追热点补充、长期慢慢写都可以",
+            "你想让读者看完之后获得什么？比如省时间、被安慰、少踩坑、马上能照做都可以",
+            "你现在最有把握连续讲三期的具体小主题是什么？",
         ]
 
     def _missing_persona_dimensions(self, context_text: str) -> list[str]:
@@ -1776,6 +1822,88 @@ class UnifiedAgentChatService:
         if not isinstance(candidates, list):
             return []
         return [str(item).strip() for item in candidates if isinstance(item, str) and item.strip()]
+
+    def _merge_persona_follow_up_payload(
+        self,
+        existing_payload: Dict[str, Any],
+        incoming_payload: Any,
+        latest_message: str,
+    ) -> Dict[str, Any]:
+        incoming = incoming_payload if isinstance(incoming_payload, dict) else {}
+        if not existing_payload:
+            merged = deepcopy(incoming)
+        else:
+            incoming_draft = incoming.get("personaDraft") if isinstance(incoming.get("personaDraft"), dict) else incoming
+            merged = self._deep_merge_persona_payload(existing_payload, incoming_draft if isinstance(incoming_draft, dict) else {})
+            for key in ("followUpQuestions", "nextQuestions", "isReadyToSave", "conversationSummary", "memoryMeta", "basicInfo"):
+                if key in incoming:
+                    merged[key] = deepcopy(incoming[key])
+        self._apply_persona_message_hint(merged, latest_message)
+        return merged
+
+    def _deep_merge_persona_payload(self, base: Dict[str, Any], incoming: Dict[str, Any]) -> Dict[str, Any]:
+        merged = deepcopy(base) if isinstance(base, dict) else {}
+        for key, value in incoming.items():
+            if value in (None, "", [], {}):
+                continue
+            current = merged.get(key)
+            if isinstance(current, dict) and isinstance(value, dict):
+                merged[key] = self._deep_merge_persona_payload(current, value)
+            elif isinstance(current, list) and isinstance(value, list):
+                merged[key] = self._merge_unique_text_list(current, value)
+            else:
+                merged[key] = deepcopy(value)
+        return merged
+
+    def _apply_persona_message_hint(self, payload: Dict[str, Any], latest_message: str) -> None:
+        hint = self._clean_persona_user_hint(latest_message)
+        if not hint:
+            return
+        text = re.sub(r"\s+", "", hint.lower())
+        if self._matches(text, ("文案", "长文案", "短文案", "图配文", "碎碎念", "文学", "文艺", "诗意", "表达")):
+            self._append_persona_list_value(payload, "contentStyle", hint)
+        elif self._matches(text, ("同龄", "新手", "用户", "网友", "粉丝", "受众", "人群", "姐妹", "同好")):
+            self._append_persona_list_value(payload, "audience", hint)
+        elif self._matches(text, ("照片", "截图", "素材", "手机", "日常", "实拍", "图片", "视频")):
+            self._append_persona_list_value(payload, "referenceCreatorDirections", hint)
+        else:
+            persona = payload.get("persona") if isinstance(payload.get("persona"), dict) else {}
+            description = str(persona.get("description") or "").strip()
+            if hint not in description:
+                persona["description"] = f"{description}，补充偏好：{hint}" if description else f"补充偏好：{hint}"
+            payload["persona"] = persona
+
+    def _append_persona_list_value(self, payload: Dict[str, Any], key: str, value: str) -> None:
+        current = payload.get(key)
+        values = current if isinstance(current, list) else []
+        payload[key] = self._merge_unique_text_list(values, [value], limit=4)
+
+    def _merge_unique_text_list(self, current: list[Any], incoming: list[Any], *, limit: int = 6) -> list[str]:
+        result: list[str] = []
+        seen: set[str] = set()
+        for item in [*current, *incoming]:
+            text = str(item or "").strip()
+            if not text:
+                continue
+            signature = self._question_signature(text)
+            if signature in seen:
+                continue
+            result.append(text)
+            seen.add(signature)
+            if len(result) >= limit:
+                break
+        return result
+
+    def _clean_persona_user_hint(self, latest_message: str) -> str:
+        text = str(latest_message or "").strip()
+        if not text:
+            return ""
+        if ":" in text:
+            text = text.rsplit(":", 1)[-1].strip()
+        if "：" in text:
+            text = text.rsplit("：", 1)[-1].strip()
+        text = re.sub(r"^(我希望|我想|我更想|希望|更偏向于|偏向于|可以|就是|是)", "", text).strip(" ，。,.！!？?")
+        return self._compact(text, 40)
 
     def _content_revision_actions(self, payload: Dict[str, Any]) -> list[str]:
         if not payload:
@@ -1914,7 +2042,10 @@ class UnifiedAgentChatService:
                 if isinstance(memory_id, str) and memory_id
                 else None
             )
+            payload = memory.get("payload") if isinstance(memory, dict) and isinstance(memory.get("payload"), dict) else {}
             summary_text = memory.get("summary_text", "") if memory else ""
+            if module == "persona":
+                summary_text = self._persona_summary(payload) or summary_text
             summary[module] = {
                 "done": bool(memory and memory.get("done")),
                 "title": SUMMARY_TITLES[module],
@@ -1922,6 +2053,10 @@ class UnifiedAgentChatService:
                 "message_id": memory.get("source_message_id") if memory else None,
                 "memory_id": memory.get("memory_id") if memory else None,
             }
+            if module == "trending":
+                evidence_summary = payload.get("evidenceSummary") if isinstance(payload, dict) else None
+                if isinstance(evidence_summary, dict):
+                    summary[module]["evidence_summary"] = evidence_summary
             if module == "content":
                 summary[module]["items"] = self._content_summary_items(user_id, conversation_id, conversation)
         return summary
@@ -2060,9 +2195,13 @@ class UnifiedAgentChatService:
         draft_persona = draft.get("persona") if isinstance(draft.get("persona"), dict) else {}
         return self._compact(
             str(
-                card_preview.get("personaLabel")
-                or persona.get("name")
+                persona.get("name")
+                or persona.get("title")
                 or draft_persona.get("name")
+                or draft_persona.get("title")
+                or payload.get("title")
+                or draft.get("title")
+                or card_preview.get("personaLabel")
                 or persona.get("description")
                 or ""
             ),
@@ -2206,11 +2345,11 @@ class UnifiedAgentChatService:
         return "\n".join(
             part
             for part in [
-                f"**人设标题：**{persona.get('name') or self._persona_summary(payload)}" if persona.get("name") or self._persona_summary(payload) else "",
+                f"**人设标题：** {persona.get('name') or self._persona_summary(payload)}" if persona.get("name") or self._persona_summary(payload) else "",
                 str(persona.get("description") or "").strip(),
-                f"**内容方向：**{niche.get('primary')}" if niche.get("primary") else "",
-                f"**目标受众：**{'、'.join(str(item) for item in audience[:3])}" if audience else "",
-                f"**内容风格：**{'、'.join(str(item) for item in content_style[:3])}" if content_style else "",
+                f"**内容方向：** {niche.get('primary')}" if niche.get("primary") else "",
+                f"**目标受众：** {'、'.join(str(item) for item in audience[:3])}" if audience else "",
+                f"**内容风格：** {'、'.join(str(item) for item in content_style[:3])}" if content_style else "",
             ]
             if part
         ).strip()

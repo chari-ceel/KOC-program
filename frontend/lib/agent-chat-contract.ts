@@ -56,6 +56,16 @@ export interface AgentFlowSummaryItem {
   message_id: string | null;
   memory_id: string | null;
   items?: AgentContentDraftPoint[];
+  evidence_summary?: AgentEvidenceSummary;
+}
+
+export interface AgentEvidenceSummary {
+  tier?: 'direct_xhs' | 'public_web' | 'historical' | 'inferred' | string;
+  label?: string;
+  sourceType?: string;
+  sourceCount?: number;
+  validationKeywords?: string[];
+  limitations?: string;
 }
 
 export interface AgentFlowSummary {

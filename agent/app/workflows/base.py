@@ -101,10 +101,15 @@ class BaseWorkflow:
                     retrieval_request,
                 )
                 tool_registry = ToolRegistry(get_settings())
-                retrieval_result, tool_calls = tool_registry.search_with_fallback(
-                    retrieval_request
-                )
-                if retrieval_result.status != "success":
+                if plan.force_retrieval:
+                    retrieval_result, tool_calls = tool_registry.search_trend_evidence(
+                        retrieval_request
+                    )
+                else:
+                    retrieval_result, tool_calls = tool_registry.search_with_fallback(
+                        retrieval_request
+                    )
+                if retrieval_result.status != "success" and not plan.force_retrieval:
                     return self._real_research_failed(request, tool_calls)
                 final_request = self._request_with_retrieval_context(
                     final_request,
@@ -146,10 +151,11 @@ class BaseWorkflow:
         response.metadata[metadata_key] = retrieval_result.source
         response.metadata["modelRole"] = plan.worker_role
         response.metadata["appliedSkills"] = self._applied_skills_for_request(final_request)
-        response.metadata["webSearchDecision"] = "used"
+        response.metadata["webSearchDecision"] = "used" if retrieval_result.status == "success" else "failed_open"
+        response.metadata["evidenceSummary"] = self._evidence_summary(retrieval_result, tool_calls)
         response.metadata["agentPlan"] = self.orchestrator.agent_plan_summary(
             plan,
-            web_search_decision="used",
+            web_search_decision=response.metadata["webSearchDecision"],
             retrieval_reason=retrieval_reason,
         )
         response.metadata["qualityChecks"] = self._quality_checks(
@@ -157,7 +163,7 @@ class BaseWorkflow:
             source_status=retrieval_result.status,
             source_count=len(retrieval_result.items),
         )
-        response.metadata["subAgentTrace"] = self.orchestrator.trace_metadata(plan, web_search_decision="used", retrieval_source=retrieval_result.source, retrieval_reason=retrieval_reason)
+        response.metadata["subAgentTrace"] = self.orchestrator.trace_metadata(plan, web_search_decision=response.metadata["webSearchDecision"], retrieval_source=retrieval_result.source, retrieval_reason=retrieval_reason)
         return response
 
     def _normalize_retrieval_request(
@@ -227,7 +233,57 @@ class BaseWorkflow:
             }
         ]
         context["toolCalls"] = [call.model_dump(mode="json") for call in tool_calls]
+        context["evidenceSummary"] = self._evidence_summary(retrieval_result, tool_calls)
         return request.model_copy(update={"context": context})
+
+    def _evidence_summary(
+        self,
+        retrieval_result: RetrievalToolResult | None,
+        tool_calls: list[ToolCall] | None = None,
+    ) -> dict:
+        if retrieval_result is None:
+            return {
+                "tier": "inferred",
+                "label": "需要验证",
+                "sourceType": "none",
+                "sourceCount": 0,
+                "validationKeywords": [],
+                "limitations": "本轮没有使用外部检索结果，只能基于上下文做保守判断。",
+            }
+        if retrieval_result.status == "success":
+            tier = "direct_xhs" if retrieval_result.source == "xhs_fetcher" else "public_web"
+            label = "直接小红书证据" if tier == "direct_xhs" else "公开网页佐证"
+            return {
+                "tier": tier,
+                "label": label,
+                "sourceType": retrieval_result.source,
+                "sourceCount": len(retrieval_result.items),
+                "validationKeywords": self._validation_keywords_from_items(retrieval_result),
+                "limitations": "工具结果用于选题判断，不代表官方热度排名。",
+            }
+        first_error = retrieval_result.error.message if retrieval_result.error else ""
+        failed_sources = [
+            str((call.inputSummary or {}).get("source"))
+            for call in (tool_calls or [])
+            if call.status == "failed" and (call.inputSummary or {}).get("source")
+        ]
+        return {
+            "tier": "inferred",
+            "label": "需要验证",
+            "sourceType": "none",
+            "sourceCount": 0,
+            "failedSources": list(dict.fromkeys(failed_sources)),
+            "validationKeywords": [],
+            "limitations": first_error or "本轮未拿到可用检索结果，已降级为保守判断。",
+        }
+
+    def _validation_keywords_from_items(self, retrieval_result: RetrievalToolResult) -> list[str]:
+        keywords: list[str] = []
+        for item in retrieval_result.items[:3]:
+            title = " ".join(str(item.title or "").split())
+            if title and title not in keywords:
+                keywords.append(title[:40])
+        return keywords[:3]
 
     def _prompt_with_retrieval_result(
         self,

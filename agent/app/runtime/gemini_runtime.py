@@ -319,6 +319,14 @@ class GeminiRuntime(ModelRuntime):
                         "discoveryKeywords": ["string, 2-3 short trend keywords"],
                         "shortTopics": ["string, 2-3 short topic phrases"],
                     },
+                    "evidenceSummary": {
+                        "tier": "direct_xhs|public_web|historical|inferred",
+                        "label": "string, short user-facing evidence label",
+                        "sourceType": "string",
+                        "sourceCount": "number",
+                        "validationKeywords": ["string"],
+                        "limitations": "string",
+                    },
                 },
                 "savePayload": {
                     "type": "trend_tracking_result",

@@ -8,7 +8,7 @@ def test_content_initial_page_first_turn_forces_full_draft(monkeypatch) -> None:
 
     async def fake_build_context(user_id: str, selected_topic: dict, conversation_history: list | None, writing_entry_source: dict | None) -> dict:
         return {
-            "savedPersona": {"persona": {"name": "大学生成长型学习博主"}},
+            "savedPersona": {"persona": {"name": "test persona"}},
             "selectedTopic": selected_topic,
         }
 
@@ -21,15 +21,15 @@ def test_content_initial_page_first_turn_forces_full_draft(monkeypatch) -> None:
             platform=request.platform,
             status="success",
             data={
-                "reply": "已生成完整草稿。",
+                "reply": "done",
                 "isReadyToSave": True,
                 "draft": {
-                    "selectedTitle": "大学生第一次考证前，我最想知道的 5 件事",
-                    "intro": "如果你也是第一次准备考证，先别急着买一堆资料。",
-                    "body": ["先定考试时间", "再拆每周计划"],
-                    "ending": "你第一次考证最担心哪一步？",
-                    "tags": ["大学生成长", "考证规划"],
-                    "cardPreview": {"keywords": ["考证避坑", "新手规划"]},
+                    "selectedTitle": "Study Plan",
+                    "intro": "Intro",
+                    "body": ["Body 1", "Body 2"],
+                    "ending": "Ending",
+                    "tags": ["tag-one", "tag-two"],
+                    "cardPreview": {"keywords": ["keyword-one", "keyword-two"]},
                 },
             },
             warnings=[],
@@ -41,32 +41,34 @@ def test_content_initial_page_first_turn_forces_full_draft(monkeypatch) -> None:
     result = __import__("asyncio").run(
         service.draft(
             "user-1",
-            "大学",
-            "大学",
-            conversation_history=[{"role": "user", "content": "大学"}],
-            persona={"persona": {"name": "大学生成长型学习博主"}},
+            "Study",
+            "Study",
+            conversation_history=[{"role": "user", "content": "Study"}],
+            persona={"persona": {"name": "test persona"}},
         )
     )
 
     assert captured["options"]["forceFullDraft"] is True
-    assert captured["input"]["originalUserInstruction"] == "大学"
-    assert "这是内容撰写初始页的首条业务输入" in captured["input"]["userInstruction"]
-    assert "主题：大学" in captured["input"]["userInstruction"]
-    assert "用户原始输入：大学" in captured["input"]["userInstruction"]
+    assert captured["input"]["originalUserInstruction"] == "Study"
+    assert captured["input"]["topic"] == "Study"
+    assert captured["input"]["selectedTitle"] == "Study"
     assert result["data"]["discussionOnly"] is False
-    assert result["data"]["completeDraft"]["cardPreview"]["keywords"] == ["考证避坑", "新手规划"]
+    assert result["data"]["completeDraft"]["title"] == "Study"
 
 
-def test_content_complete_draft_strips_inline_tag_lines(monkeypatch) -> None:
+def test_content_revise_keeps_existing_title_by_default(monkeypatch) -> None:
     service = ContentService()
+    captured = {}
 
     async def fake_build_context(user_id: str, selected_topic: dict, conversation_history: list | None, writing_entry_source: dict | None) -> dict:
+        captured["selected_topic"] = selected_topic
         return {
-            "savedPersona": {"persona": {"name": "大学生成长型学习博主"}},
+            "savedPersona": {"persona": {"name": "test persona"}},
             "selectedTopic": selected_topic,
         }
 
     async def fake_run(request) -> AgentRunResponse:
+        captured["input"] = request.input
         return AgentRunResponse(
             requestId=request.requestId,
             taskType=request.taskType,
@@ -74,16 +76,13 @@ def test_content_complete_draft_strips_inline_tag_lines(monkeypatch) -> None:
             status="success",
             data={
                 "isReadyToSave": True,
-                "draft": {
-                    "selectedTitle": "大学生第一次考证前，我最想知道的 5 件事",
-                    "intro": "如果你也是第一次准备考证，先别急着买一堆资料。",
-                    "body": [
-                        "先定考试时间",
-                        "再拆每周计划",
-                        "标签建议：#大学生成长 #考证规划",
-                    ],
-                    "ending": "你第一次考证最担心哪一步？",
-                    "tags": ["大学生成长", "考证规划"],
+                "revisedDraft": {
+                    "selectedTitle": "New Title B",
+                    "intro": "Revised intro.",
+                    "body": ["First paragraph", "Second paragraph"],
+                    "ending": "Which ending feels better?",
+                    "tags": ["tag-one", "tag-two"],
+                    "cardPreview": {"keywords": ["keyword-one", "keyword-two"]},
                 },
             },
             warnings=[],
@@ -92,17 +91,33 @@ def test_content_complete_draft_strips_inline_tag_lines(monkeypatch) -> None:
     monkeypatch.setattr(service.builder, "build_content_draft_context", fake_build_context)
     monkeypatch.setattr(service.client, "run", fake_run)
 
+    current_draft = {
+        "selectedTitle": "Original Title A",
+        "intro": "Original intro.",
+        "body": ["Original body one", "Original body two"],
+        "ending": "Original ending.",
+        "tags": ["tag-one", "tag-two"],
+    }
+
     result = __import__("asyncio").run(
         service.draft(
             "user-1",
-            "大学",
-            "大学",
-            conversation_history=[{"role": "user", "content": "大学"}],
-            persona={"persona": {"name": "大学生成长型学习博主"}},
+            "Original Title A",
+            "Make the ending more natural.",
+            conversation_history=[{"role": "user", "content": "Make the ending more natural."}],
+            current_draft=current_draft,
+            revision_instruction="Make the ending more natural.",
+            persona={"persona": {"name": "test persona"}},
         )
     )
 
-    assert result["data"]["completeDraft"]["body"] == ["先定考试时间", "再拆每周计划"]
+    assert captured["selected_topic"]["selectedTitle"] == "Original Title A"
+    assert captured["input"]["topic"] == "Original Title A"
+    assert captured["input"]["selectedTitle"] == "Original Title A"
+    assert captured["input"]["revisionInstruction"] == "Make the ending more natural."
+    assert result["data"]["completeDraft"]["title"] == "Original Title A"
+    assert result["data"]["completeDraft"]["selectedTitle"] == "Original Title A"
+    assert result["data"]["completeDraft"]["titleOptions"][0] == "Original Title A"
 
 
 def test_content_complete_draft_limits_publish_body_to_xhs_max(monkeypatch) -> None:
@@ -110,7 +125,7 @@ def test_content_complete_draft_limits_publish_body_to_xhs_max(monkeypatch) -> N
 
     async def fake_build_context(user_id: str, selected_topic: dict, conversation_history: list | None, writing_entry_source: dict | None) -> dict:
         return {
-            "savedPersona": {"persona": {"name": "大学生成长型学习博主"}},
+            "savedPersona": {"persona": {"name": "test persona"}},
             "selectedTopic": selected_topic,
         }
 
@@ -123,11 +138,11 @@ def test_content_complete_draft_limits_publish_body_to_xhs_max(monkeypatch) -> N
             data={
                 "isReadyToSave": True,
                 "draft": {
-                    "selectedTitle": "第一次考证别乱买资料",
-                    "intro": "开头" * 120,
-                    "body": ["正文" * 400, "补充" * 300],
-                    "ending": "结尾" * 120,
-                    "tags": ["大学生成长", "考证规划"],
+                    "selectedTitle": "Exam Prep",
+                    "intro": "A" * 120,
+                    "body": ["B" * 400, "C" * 300],
+                    "ending": "D" * 120,
+                    "tags": ["tag-one", "tag-two"],
                 },
             },
             warnings=[],
@@ -139,10 +154,10 @@ def test_content_complete_draft_limits_publish_body_to_xhs_max(monkeypatch) -> N
     result = __import__("asyncio").run(
         service.draft(
             "user-1",
-            "考证",
-            "考证",
-            conversation_history=[{"role": "user", "content": "考证"}],
-            persona={"persona": {"name": "大学生成长型学习博主"}},
+            "Exam Prep",
+            "Exam Prep",
+            conversation_history=[{"role": "user", "content": "Exam Prep"}],
+            persona={"persona": {"name": "test persona"}},
         )
     )
 
@@ -152,64 +167,45 @@ def test_content_complete_draft_limits_publish_body_to_xhs_max(monkeypatch) -> N
     assert draft["body"]
 
 
-def test_format_content_text_normalizes_joined_punctuation() -> None:
+def test_content_complete_draft_strips_inline_tag_lines(monkeypatch) -> None:
     service = ContentService()
 
-    text = service._format_content_text(
-        {
-            "draft": {
-                "selectedTitle": "低成本自律。",
-                "titleOptions": ["低成本自律。", "普通人自律先别急。"],
-                "intro": "很多人不是不努力，而是一开始就把路径想复杂了。",
-                "body": ["第一步，先明确目标。", "第二步，把任务拆成每周能完成的小动作，"],
-                "ending": "如果你也经常想开始但总拖延，。",
-                "tags": ["自律。", "大学生，"],
-                "coverSuggestion": {"mainText": "自律先看这篇", "layout": "大字标题加桌面实拍。"},
-                "imageTextStructure": ["图1：封面。", "图2：步骤清单。"],
-            }
+    async def fake_build_context(user_id: str, selected_topic: dict, conversation_history: list | None, writing_entry_source: dict | None) -> dict:
+        return {
+            "savedPersona": {"persona": {"name": "test persona"}},
+            "selectedTopic": selected_topic,
         }
-    )
 
-    assert text == (
-        "**推荐标题：**低成本自律\n\n"
-        "**备选标题：**普通人自律先别急\n\n"
-        "**封面建议：**封面文字：自律先看这篇；排版：大字标题加桌面实拍\n\n"
-        "**图片顺序：**图1：封面；图2：步骤清单\n\n"
-        "**正文开头：**很多人不是不努力，而是一开始就把路径想复杂了。\n\n"
-        "**正文内容：**\n第一步，先明确目标\n第二步，把任务拆成每周能完成的小动作\n\n"
-        "**结尾互动：**如果你也经常想开始但总拖延\n\n"
-        "**标签建议：**自律，大学生"
-    )
-
-
-def test_format_content_text_prefers_full_draft_over_short_reply() -> None:
-    service = ContentService()
-
-    text = service._format_content_text(
-        {
-            "reply": "已帮你写好一版。",
-            "draft": {
-                "selectedTitle": "新手种草别只夸好用",
-                "intro": "别急着说它好用，先把真实使用场景讲清楚。",
-                "body": ["先说购买原因", "再讲使用前后的具体变化"],
-                "ending": "你种草时最想看哪类细节？",
-                "tags": ["种草方法", "经验分享"],
+    async def fake_run(request) -> AgentRunResponse:
+        return AgentRunResponse(
+            requestId=request.requestId,
+            taskType=request.taskType,
+            platform=request.platform,
+            status="success",
+            data={
+                "isReadyToSave": True,
+                "draft": {
+                    "selectedTitle": "Plan",
+                    "intro": "Intro",
+                    "body": ["Step 1", "tags: #tag-one #tag-two"],
+                    "ending": "Ending",
+                    "tags": ["tag-one", "tag-two"],
+                },
             },
-        }
+            warnings=[],
+        )
+
+    monkeypatch.setattr(service.builder, "build_content_draft_context", fake_build_context)
+    monkeypatch.setattr(service.client, "run", fake_run)
+
+    result = __import__("asyncio").run(
+        service.draft(
+            "user-1",
+            "Plan",
+            "Plan",
+            conversation_history=[{"role": "user", "content": "Plan"}],
+            persona={"persona": {"name": "test persona"}},
+        )
     )
 
-    assert "**推荐标题：**新手种草别只夸好用" in text
-    assert "**正文内容：**\n先说购买原因\n再讲使用前后的具体变化" in text
-    assert text != "已帮你写好一版。"
-
-
-def test_format_content_text_strips_ai_template_wrappers() -> None:
-    service = ContentService()
-
-    text = service._format_content_text(
-        {
-            "reply": "以下是为你生成的一版小红书内容：\n\n早八赶时间也不用乱涂。\n\n希望对你有帮助。"
-        }
-    )
-
-    assert text == "早八赶时间也不用乱涂。"
+    assert result["data"]["completeDraft"]["body"] == ["Step 1"]

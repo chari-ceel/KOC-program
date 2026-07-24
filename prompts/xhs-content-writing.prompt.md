@@ -141,6 +141,7 @@ contentType = image_text_note
 - 但如果这是内容撰写初始页的首条业务输入，本轮必须直接输出完整草稿，不允许退回讨论态；即使用户只输入简短主题、口吻偏好或一句方向描述，也同样如此。
 - 只有当用户明确要求“生成完整笔记 / 写一篇 / 定稿 / 保存 / 给我最终版”，或上下文已经足够明确时，才填完整 `draft` 或 `revisedDraft`。
 - 如果 `taskType` 是 `content.revise`，且用户是在已有草稿上提出“修改标题 / 换个结尾 / 正文更口语 / 调整开头 / 标签换一组 / 缩短 / 加细节”等直接内容修改要求，必须视为“应用修改”，而不是讨论修改思路。
+- `content.revise` 默认保留 `currentDraft` 的 `selectedTitle` 不变；只有用户明确要求改标题时，才更新标题和 `titleOptions`。
 - 如果 `options.forceFullDraft` 为 `true`，本轮必须输出可直接展示和保存的完整草稿：
   - `taskType = content.draft` 时，输出完整 `draft`
   - `taskType = content.revise` 时，输出完整 `revisedDraft`

@@ -12,6 +12,7 @@ from app.schemas.debug import (
     TavilySearchRequest,
 )
 from app.schemas.jobs import AgentJobCreateRequest
+from app.tools.registry import ToolRegistry
 
 
 router = APIRouter()
@@ -39,45 +40,11 @@ def agent_tasks() -> dict:
 @router.get("/agent/tools")
 def agent_tools() -> dict:
     settings = get_settings()
-    web_search_status = (
-        "available"
-        if settings.enable_web_search and settings.web_search_provider and settings.web_search_api_key
-        else "needs_config"
-    )
+    retrieval_doctor = ToolRegistry(settings).doctor()
 
     return {
         "tools": [
-            {
-                "toolType": "retrieval",
-                "status": "configured" if web_search_status == "available" else "partial",
-                "sources": [
-                    {
-                        "source": "web_search",
-                        "status": web_search_status,
-                        "role": "primary",
-                    },
-                    {
-                        "source": "browser_search",
-                        "status": "reserved",
-                        "role": "reserved",
-                    },
-                    {
-                        "source": "xhs_fetcher",
-                        "status": "reserved",
-                        "role": "reserved",
-                    },
-                    {
-                        "source": "builtin_trend_store",
-                        "status": "reserved",
-                        "role": "reserved",
-                    },
-                    {
-                        "source": "official_rule_store",
-                        "status": "reserved",
-                        "role": "reserved",
-                    },
-                ],
-            },
+            retrieval_doctor,
             {
                 "toolType": "context_provider",
                 "status": "reserved",

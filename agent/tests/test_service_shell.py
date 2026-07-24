@@ -37,7 +37,9 @@ def test_agent_tools_endpoint() -> None:
     sources = {source["source"]: source for source in retrieval_tool["sources"]}
 
     assert retrieval_tool["toolType"] == "retrieval"
-    assert sources["web_search"]["role"] == "primary"
+    assert sources["xhs_fetcher"]["role"] == "primary"
+    assert sources["xhs_fetcher"]["status"] in {"available", "needs_auth", "needs_config", "disabled", "failed"}
+    assert sources["web_search"]["role"] == "fallback"
     assert "mock_retrieval" not in sources
 
 

@@ -343,8 +343,8 @@ function normalizeAgentDraft(payload: unknown, fallbackTopic: string, fallbackIn
   if (!isRecord(draft)) return fallback;
 
   const noteTitle = limitXhsTitle(
-    (typeof draft.title === 'string' && draft.title.trim()) ||
     (typeof draft.selectedTitle === 'string' && draft.selectedTitle.trim()) ||
+    (typeof draft.title === 'string' && draft.title.trim()) ||
     (Array.isArray(draft.titleOptions) && typeof draft.titleOptions[0] === 'string' && draft.titleOptions[0]) ||
     fallback.noteTitle,
   );

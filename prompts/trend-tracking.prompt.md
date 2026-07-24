@@ -36,6 +36,7 @@ topic.recommend
 - 热门追踪是产品主功能，不能弱化成普通聊天或纯选题推荐。
 - 热门追踪最终服务的是图文作品创作，不输出视频、口播、分镜、长视频或短视频执行方案。
 - 必须保留 `trendSummary`、`hotTrends`、`audienceNeeds`、`topicOpportunities`、`validationKeywords` 和 `cardPreview` 的结构化输出能力。
+- 如果上下文提供 `evidenceSummary`，必须保留证据等级和限制说明；不要把“需要验证”夸成真实热度。
 - 有真实检索结果时，优先引用检索信息做判断。
 - 没有真实检索结果时，明确写成“需要用关键词再验证”，不要伪造平台数据。
 - 表达上少用运营术语，多用“可以写成哪篇图文”的说法。
@@ -110,6 +111,7 @@ topic.recommend
 ```text
 retrievalResults
 toolResults
+evidenceSummary
 trendHistory
 conversationHistory
 summarySourceConversation
@@ -233,6 +235,14 @@ savedPersona
   "cardPreview": {
     "discoveryKeywords": ["2-3 个短趋势关键词"],
     "shortTopics": ["2-3 个短选题"]
+  },
+  "evidenceSummary": {
+    "tier": "direct_xhs|public_web|historical|inferred",
+    "label": "直接小红书证据|公开网页佐证|历史趋势参考|需要验证",
+    "sourceType": "xhs_fetcher|web_search|trendHistory|none",
+    "sourceCount": 0,
+    "validationKeywords": ["内容"],
+    "limitations": "内容"
   },
   "validationKeywords": ["内容"]
 }
